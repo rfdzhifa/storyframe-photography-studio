@@ -17,7 +17,7 @@
         <a href="#contact" class="text-gray-500 text-sm hover:text-blue-600 transition">CONTACT</a>
       </div>
     
-      <a href="/booking" class="h-12 px-8 bg-blue-600 text-white text-sm font-medium rounded-full hover:bg-blue-700 transition flex justify-center items-center">
+  <a href="/booking" class="h-12 px-8 bg-blue-600 text-white text-sm font-medium rounded-full hover:bg-blue-700 transition flex justify-center items-center">
         BOOKING
     </a>
   </nav>

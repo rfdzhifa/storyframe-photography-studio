@@ -15,9 +15,9 @@
                     <div class="w-[627px] text-center text-neutral-100 text-base font-normal">Storyframe adalah studio fotografi profesional yang berdedikasi untuk menjadikan setiap momen Anda sebagai kisah visual yang tak terlupakan.</div>
                 </div>
 
-                <div class="h-12 px-8 bg-white rounded-[50px] inline-flex justify-center items-center gap-2.5">
-                    <div class="text-black text-sm font-medium">BOOKING</div>
-                </div>
+                <a href="/booking" class="h-12 px-8 bg-white text-black text-sm font-medium rounded-full hover:bg-blue-100 transition flex justify-center items-center">
+                    BOOKING
+                </a>
             </div>
         </div>
     </section>
@@ -36,8 +36,8 @@
                     <span class="text-2xl font-medium">🔥</span>
                 </div>
                 <div class="flex flex-col items-start gap-3">
-                    <h3 class="text-gray-900 text-2xl font-medium font-['Inter_Tight']">PROFESSIONAL TEAM</h3>
-                    <p class="text-gray-600 text-base font-normal font-['Inter_Tight'] leading-relaxed">Fotografer kami memiliki keahlian teknis tinggi dan sensitivitas artistik untuk menangkap esensi setiap momen.</p>
+                    <h3 class="text-gray-900 text-2xl font-medium">PROFESSIONAL TEAM</h3>
+                    <p class="text-gray-600 text-base font-normal leading-relaxed">Fotografer kami memiliki keahlian teknis tinggi dan sensitivitas artistik untuk menangkap esensi setiap momen.</p>
                 </div>
             </div>
 
@@ -47,8 +47,8 @@
                     <span class="text-2xl font-medium">📷</span>
                 </div>
                 <div class="flex flex-col items-start gap-3">
-                    <h3 class="text-white text-2xl font-medium font-['Inter_Tight']">COMFORTABLE PLACE</h3>
-                    <p class="text-gray-200 text-base font-normal font-['Inter_Tight'] leading-relaxed">Dirancang dengan desain yang estetis dan fasilitas lengkap, studio kami siap menunjang sesi foto apapun.</p>
+                    <h3 class="text-white text-2xl font-medium">COMFORTABLE PLACE</h3>
+                    <p class="text-gray-200 text-base font-normal leading-relaxed">Dirancang dengan desain yang estetis dan fasilitas lengkap, studio kami siap menunjang sesi foto apapun.</p>
                 </div>
             </div>
 
@@ -58,8 +58,8 @@
                     <span class="text-2xl font-medium">⚡️</span>
                 </div>
                 <div class="flex flex-col items-start gap-3">
-                    <h3 class="text-gray-900 text-2xl font-medium font-['Inter_Tight']">FAST DIGITAL PROCESS</h3>
-                    <p class="text-gray-600 text-base font-normal font-['Inter_Tight'] leading-relaxed">Mulai dari pemesanan hingga pengiriman hasil akhir—semuanya terintegrasi secara digital untuk pengalaman yang efisien dan mudah.</p>
+                    <h3 class="text-gray-900 text-2xl font-medium">FAST DIGITAL PROCESS</h3>
+                    <p class="text-gray-600 text-base font-normal leading-relaxed">Mulai dari pemesanan hingga pengiriman hasil akhir—semuanya terintegrasi secara digital untuk pengalaman yang efisien dan mudah.</p>
                 </div>
             </div>
         </div>
