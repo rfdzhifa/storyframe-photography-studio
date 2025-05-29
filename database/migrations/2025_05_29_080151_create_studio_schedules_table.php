@@ -6,23 +6,20 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('studio_schedules', function (Blueprint $table) {
             $table->id();
-            $table->tinyInteger('day_of_week'); // 0=Sun,1=Mon,...
-            $table->time('open_time')->nullable();
-            $table->time('close_time')->nullable();
+            $table->date('date');
+            $table->time('start_time');
+            $table->time('end_time');
+            $table->boolean('is_available')->default(true);
             $table->timestamps();
+            
+            $table->unique(['date', 'start_time', 'end_time']);
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('studio_schedules');
