@@ -6,7 +6,7 @@
 
 @section('content')
 
-  <form action="{{ route('booking.store') }}" method="POST">
+  <form id="booking-form" data-slots-url="/booking/slots" action="{{ route('booking.store') }}" method=" POST">
     @csrf
 
     <!-- Step 1: Contact Information -->
@@ -89,11 +89,9 @@
         class="w-full rounded-full border border-gray-300 bg-gray-50 px-5 py-3 text-sm focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300">
         <option value="">Select a service</option>
         @foreach($services as $service)
-      <option value="{{ strtolower(str_replace([' ', 'Photography'], ['-', ''], $service->name)) }}"
-        data-id="{{ $service->id }}" {{ old('service') == strtolower(str_replace([' ', 'Photography'], ['-', ''], $service->name)) ? 'selected' : '' }}>
+      <option value="{{ $service->id }}">
         {{ $service->name }}
       </option>
-
       @endforeach
         </select>
         @error('service')
@@ -106,7 +104,7 @@
         <label for="package" class="block text-sm font-medium text-gray-700">
         Package <span class="text-red-500">*</span>
         </label>
-        <select id="package_id" name="package_id" onchange="updatePrice()"
+        <select id="package" name="package" onchange="updatePrice()"
         class="w-full rounded-full border border-gray-300 bg-gray-50 px-5 py-3 text-sm focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300">
         <option value="">Select a package</option>
         <!-- Will be populated by JavaScript -->

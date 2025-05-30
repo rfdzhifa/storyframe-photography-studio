@@ -22,7 +22,7 @@ class StudioSchedule extends Model
      */
     protected $fillable = [
         'date',
-        'start_time',
+        'preferred_time',
         'end_time',
         'is_available',
     ];

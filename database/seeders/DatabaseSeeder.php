@@ -5,6 +5,8 @@ namespace Database\Seeders;
 use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Database\Seeders\StudioScheduleSeeder;
+
 
 class DatabaseSeeder extends Seeder
 {
@@ -22,6 +24,11 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             BookingStatusSeeder::class,
+            StudioScheduleSeeder::class,
+            PackageSeeder::class,
+            ServiceSeeder::class,
+            ServicePackageSeeder::class,
+            
         ]);
     }
 }

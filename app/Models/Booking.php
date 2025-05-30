@@ -25,13 +25,13 @@ class Booking extends Model
         'customer_name',
         'customer_email',
         'customer_phone',
-        'service_id',
-        'package_id',
+        'service',
+        'package',
         'studio_schedule_id',
         'booking_status_id',
         'total_price',
         'notes',
-        'booking_date',
+        'preferred_date',
         'payment_option',
         'down_payment_amount',
         'payment_status',
@@ -43,7 +43,7 @@ class Booking extends Model
     protected $casts = [
         'total_price' => 'decimal:2',
         'down_payment_amount' => 'decimal:2',
-        'booking_date' => 'datetime',
+        'preferred_date' => 'datetime',
     ];
 
     /**

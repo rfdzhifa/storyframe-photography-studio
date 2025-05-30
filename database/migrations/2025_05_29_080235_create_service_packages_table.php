@@ -14,12 +14,12 @@ return new class extends Migration
     {
         Schema::create('service_packages', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('service_id')->constrained('services')->onDelete('cascade');
-            $table->foreignId('package_id')->constrained('packages')->onDelete('cascade');
+            $table->foreignId('service')->constrained('services')->onDelete('cascade');
+            $table->foreignId('package')->constrained('packages')->onDelete('cascade');
             $table->decimal('price', 10, 2);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
-            $table->unique(['service_id', 'package_id']);
+            $table->unique(['service', 'package']);
         });
     }
 
