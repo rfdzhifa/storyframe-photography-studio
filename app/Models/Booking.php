@@ -1,97 +1,59 @@
 <?php
-
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Booking extends Model
 {
     use HasFactory;
 
-    public const PAYMENT_OPTION_DP = 'dp';
-    public const PAYMENT_OPTION_FULL = 'full_payment';
-    public const PAYMENT_STATUS_PENDING = 'pending';
-    public const PAYMENT_STATUS_PAID = 'paid';
-    public const PAYMENT_STATUS_PARTIALLY_PAID = 'partially_paid';
-    public const PAYMENT_STATUS_REFUNDED = 'refunded';
-
-    /**
-     * @var array<int, string>
-     */
     protected $fillable = [
         'booking_code',
         'customer_name',
         'customer_email',
         'customer_phone',
-        'service',
-        'package',
-        'studio_schedule_id',
+        'service_id',
+        'package_id', 
         'booking_status_id',
+        'booking_date',
+        'start_time',
+        'end_time',
         'total_price',
         'notes',
-        'preferred_date',
         'payment_option',
         'down_payment_amount',
         'payment_status',
     ];
+    
 
-    /**
-     * @var array<string, string>
-     */
     protected $casts = [
-        'total_price' => 'decimal:2',
-        'down_payment_amount' => 'decimal:2',
-        'preferred_date' => 'datetime',
+        'booking_date' => 'date',
+        'start_time' => 'datetime:H:i:s',
+        'end_time' => 'datetime:H:i:s',
+        'down_payment_amount' => 'float',
+        'total_price' => 'float',
     ];
 
-    /**
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
-     */
-    public function service(): BelongsTo
+
+    public function service()
     {
         return $this->belongsTo(Service::class);
     }
 
-    /**
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
-     */
-    public function package(): BelongsTo
+    public function package()
     {
         return $this->belongsTo(Package::class);
     }
 
-    /**
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
-     */
-    public function studioSchedule(): BelongsTo
-    {
-        return $this->belongsTo(StudioSchedule::class);
-    }
-
-    /**
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
-     */
-    public function bookingStatus(): BelongsTo
+    public function bookingStatus()
     {
         return $this->belongsTo(BookingStatus::class);
     }
 
-    /**
-     */
-    protected static function boot()
+    // Helper: Cek apakah booking bentrok sama waktu tertentu
+    public function overlaps($start, $end)
     {
-        parent::boot();
-
-        static::creating(function ($booking) {
-            if (empty($booking->booking_code)) {
-                $booking->booking_code = 'BK-' . strtoupper(uniqid());
-            }
-        });
+        return $this->start_time < $end && $this->end_time > $start;
     }
 }

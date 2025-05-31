@@ -27,7 +27,7 @@ Route::prefix('booking')->name('booking.')->group(function () {
     Route::post('/store', [BookingController::class, 'store'])->name('store');
     
     // Get available time slots
-    Route::post('/slots', [BookingController::class, 'getAvailableSlots'])->name('slots');
+    Route::post('/slots', [BookingController::class, 'getAvailableSlots'])->name('booking.slots');
     
     // Get packages by service
     Route::post('/packages', [BookingController::class, 'getPackagesByService'])->name('packages');

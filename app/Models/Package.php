@@ -17,7 +17,7 @@ class Package extends Model
     protected $fillable = [
         'name',
         'description',
-        'duration_hours',
+        'duration_minutes',
         'max_photos',
         'includes_editing',
         'is_active',
@@ -27,7 +27,7 @@ class Package extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'duration_hours' => 'integer',
+        'duration_minutes' => 'integer',
         'max_photos' => 'integer',
         'includes_editing' => 'boolean',
         'is_active' => 'boolean',

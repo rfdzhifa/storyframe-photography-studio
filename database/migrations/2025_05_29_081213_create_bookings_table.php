@@ -17,19 +17,23 @@ return new class extends Migration {
             $table->string('customer_name');
             $table->string('customer_email');
             $table->string('customer_phone');
-
-            $table->foreignId('service')->constrained('services')->onDelete('cascade');
-            $table->foreignId('package')->constrained('packages')->onDelete('cascade');
-            $table->foreignId('studio_schedule_id')->constrained('studio_schedules')->onDelete('cascade');
+        
+            $table->foreignId('service_id')->constrained('services')->onDelete('cascade');
+            $table->foreignId('package_id')->constrained('packages')->onDelete('cascade');
             $table->foreignId('booking_status_id')->constrained('booking_status')->onDelete('restrict');
+        
+            $table->date('booking_date'); // redundan tapi berguna
+            $table->time('start_time');
+            $table->time('end_time');
+        
             $table->decimal('total_price', 10, 2);
             $table->text('notes')->nullable();
-            $table->timestamp('preferred_date')->useCurrent();
             $table->string('payment_option');
             $table->decimal('down_payment_amount', 10, 2)->nullable();
             $table->string('payment_status')->default('pending');
             $table->timestamps();
         });
+        
     }
 
     /**

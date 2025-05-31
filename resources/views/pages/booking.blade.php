@@ -6,7 +6,7 @@
 
 @section('content')
 
-  <form id="booking-form" data-slots-url="/booking/slots" action="{{ route('booking.store') }}" method=" POST">
+  <form id="booking-form" action="{{ route('booking.store') }}" method="POST">
     @csrf
 
     <!-- Step 1: Contact Information -->
@@ -185,13 +185,13 @@
       <div class="w-full flex gap-4">
         <!-- Preferred Date -->
         <div class="flex-1 space-y-2">
-        <label for="preferred_date" class="block text-sm font-medium text-gray-700">
+        <label for="booking_date" class="block text-sm font-medium text-gray-700">
           Preferred Date <span class="text-red-500">*</span>
         </label>
-        <input type="date" id="preferred_date" name="preferred_date" value="{{ old('preferred_date') }}"
+        <input type="date" id="booking_date" name="booking_date" value="{{ old('booking_date') }}"
           onchange="loadAvailableSchedules()" min="{{ date('Y-m-d') }}"
           class="w-full rounded-full border border-gray-300 bg-gray-50 px-5 py-3 text-sm focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300" />
-        @error('preferred_date')
+        @error('booking_date')
       <p class="text-sm text-red-500">{{ $message }}</p>
       @enderror
         </div>

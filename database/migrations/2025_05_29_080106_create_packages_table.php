@@ -11,7 +11,7 @@ return new class extends Migration {
             $table->id();
             $table->string('name');
             $table->text('description')->nullable();
-            $table->integer('duration_hours');
+            $table->integer('duration_minutes');
             $table->integer('max_photos');
             $table->boolean('includes_editing')->default(false);
             $table->boolean('is_active')->default(true);

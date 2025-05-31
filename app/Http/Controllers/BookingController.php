@@ -5,13 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use App\Models\Package;
 use App\Models\Service;
-use App\Models\StudioSchedule;
+use App\Models\WeeklySchedule;
 use App\Models\BookingStatus;
+use App\Models\ServicePackage;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
 
 class BookingController extends Controller
 {
@@ -34,200 +35,171 @@ class BookingController extends Controller
      * Mengambil slot waktu yang tersedia berdasarkan tanggal dan service yang dipilih.
      * API endpoint ini akan dipanggil oleh JavaScript.
      */
-    public function getAvailableSlots(Request $request)
-    {
-        $request->validate([
-            'date' => 'required|date_format:Y-m-d|after_or_equal:today|before_or_equal:' . Carbon::today()->addDays(30)->toDateString(),
-            'service' => 'required|exists:services,id',
-            'package' => 'required|exists:packages,id',
-        ]);
 
-        try {
-            $selectedDate = Carbon::parse($request->date);
-            $service = Service::findOrFail($request->service);
-            $package = Package::findOrFail($request->package);
-            $duration = (int) $package->duration_hours;
+     public function getAvailableSlots(Request $request)
+     {
+         $request->validate([
+             'date' => 'required|date',
+             'package' => 'required|exists:packages,id',
+         ]);
+     
+         $date = Carbon::parse($request->input('date'));
+         $dayName = $date->format('l'); // Contoh: "Monday"
+         $packageId = $request->input('package');
+     
+         // Ambil durasi dari package
+         $package = Package::findOrFail($packageId);
+         $duration = $package->duration_minutes;
+     
+         // Ambil jadwal berdasarkan nama hari
+         $weeklySchedule = WeeklySchedule::where('day_of_week', $dayName)
+             ->where('is_available', true)
+             ->first();
+     
+         if (!$weeklySchedule) {
+             return response()->json(['error' => 'Studio not available on this day.'], 404);
+         }
+     
+         // Generate slot dengan tanggal spesifik dari user + jam dari jadwal mingguan
+         $allSlots = $weeklySchedule->generateSlots($date->toDateString(), $duration);
+     
+         $serviceId = ServicePackage::where('package_id', $package->id)
+    ->where('is_active', true)
+    ->value('service_id');
 
-            if ($duration <= 0) {
-                return response()->json(['error' => 'Invalid service duration.'], 400);
-            }
+    $bookedSlots = Booking::whereDate('booking_date', $date->toDateString())
+        ->where('service_id', $serviceId)
+        ->get();
+     
+         // Ambil array dari waktu mulai booking
+         $bookedTimes = [];
+        foreach ($bookedSlots as $booking) {
+            $start = Carbon::parse($booking->start_time)->format('H:i');
+            $end = Carbon::parse($booking->end_time)->format('H:i');
 
-            // Cari jadwal studio yang aktif
-            // Bisa disesuaikan berdasarkan hari dalam seminggu jika perlu
-            $studioSchedule = StudioSchedule::where('is_available', true)
-                ->first(); // Atau tambahkan filter berdasarkan hari jika ada
-
-            if (!$studioSchedule) {
-                return response()->json(['error' => 'Studio schedule not available.'], 404);
-            }
-
-            $studioOpenTime = Carbon::parse($selectedDate->toDateString() . ' ' . $studioSchedule->open_time);
-            $studioCloseTime = Carbon::parse($selectedDate->toDateString() . ' ' . $studioSchedule->close_time);
-
-            $availableSlots = [];
-            $currentTime = $studioOpenTime->copy();
-            $slotInterval = 15; // Interval slot dalam menit (bisa disesuaikan)
-
-            // Jika tanggal yang dipilih adalah hari ini, mulai dari jam sekarang + 1 jam
-            if ($selectedDate->isToday()) {
-                $minStartTime = Carbon::now()->addHour()->startOfHour();
-                if ($minStartTime->gt($studioOpenTime)) {
-                    $currentTime = $minStartTime;
-                }
-            }
-
-            while ($currentTime->copy()->addMinutes($duration)->lte($studioCloseTime)) {
-                $slotStartTime = $currentTime->copy();
-                $slotEndTime = $slotStartTime->copy()->addMinutes($duration);
-
-                // Cek apakah slot ini sudah dibooking
-                $isBooked = Booking::where('service', $service->id)
-                    ->where('preferred_date', $selectedDate->toDateString())
-                    ->where(function ($query) use ($slotStartTime, $slotEndTime) {
-                        // Cek overlap dengan booking yang sudah ada
-                        $query->where(function ($q) use ($slotStartTime, $slotEndTime) {
-                            $q->where('preferred_time', '<', $slotEndTime->format('H:i:s'))
-                              ->where('end_time', '>', $slotStartTime->format('H:i:s'));
-                        });
-                    })
-                    ->whereHas('bookingStatus', function ($query) {
-                        // Hanya cek booking yang tidak dibatalkan
-                        $query->whereNotIn('name', ['Cancelled', 'Rejected']);
-                    })
-                    ->exists();
-
-                if (!$isBooked) {
-                    $availableSlots[] = [
-                        'preferred_time_value' => $slotStartTime->format('H:i'),
-                        'display_time' => $slotStartTime->format('H:i') . ' - ' . $slotEndTime->format('H:i'),
-                    ];
-                }
-
-                $currentTime->addMinutes($slotInterval);
-            }
-
-            if (empty($availableSlots)) {
-                if ($selectedDate->isToday() && Carbon::now()->gt($studioCloseTime)) {
-                    return response()->json(['error' => 'Studio operating hours for today have ended.'], 200);
-                }
-                return response()->json(['error' => 'No available slots for the selected service and date.'], 200);
-            }
-
-            return response()->json($availableSlots);
-
-        } catch (\Exception $e) {
-            Log::error("Error getAvailableSlots: " . $e->getMessage());
-            return response()->json(['error' => 'Failed to load time slots. Please try again.'], 500);
+            $bookedTimes[] = [
+                'start' => $start,
+                'end' => $end,
+            ];
         }
-    }
+     
+         // Filter slot yang bentrok
+         $availableSlots = collect($allSlots)->filter(function ($slot) use ($bookedTimes) {
+             foreach ($bookedTimes as $booked) {
+                 if (
+                     ($slot['start'] >= $booked['start'] && $slot['start'] < $booked['end']) ||
+                     ($slot['end'] > $booked['start'] && $slot['end'] <= $booked['end']) ||
+                     ($slot['start'] <= $booked['start'] && $slot['end'] >= $booked['end']) // full overlap
+                 ) {
+                     return false;
+                 }
+             }
+             return true;
+         })->values();
+     
+         return response()->json($availableSlots);
+     }
+
 
     /**
      * Menyimpan data booking baru.
      */
     public function store(Request $request)
-    {
-        $request->validate([
-            'full_name' => 'required|string|max:100',
-            'email' => 'required|email|max:100',
-            'phone_number' => 'required|string|max:20',
-            'service' => 'required|exists:services,id',
-            'package' => 'required|exists:packages,id',
-            'payment' => 'required|in:dp,full',
-            'preferred_date' => 'required|date_format:Y-m-d|after_or_equal:today|before_or_equal:' . Carbon::today()->addDays(30)->toDateString(),
-            'preferred_time' => 'required|date_format:H:i',
-            'notes' => 'nullable|string|max:500',
+{
+    $request->validate([
+        'full_name' => 'required|string|max:100',
+        'email' => 'required|email|max:100',
+        'phone_number' => 'required|string|max:20',
+        'service' => 'required|exists:services,id',
+        'package' => 'required|exists:packages,id',
+        'payment' => 'required|in:dp,full',
+        'booking_date' => 'required|date_format:Y-m-d|after_or_equal:today|before_or_equal:' . Carbon::today()->addDays(30)->toDateString(),
+        'preferred_time' => 'required|date_format:H:i',
+        'notes' => 'nullable|string|max:500',
+    ]);
+
+    DB::beginTransaction();
+
+    try {
+        $service = Service::findOrFail($request->service);
+        $package = Package::findOrFail($request->package);
+        $duration = (int) $package->duration_minutes;
+
+        $bookingDate = Carbon::parse($request->booking_date);
+        $startTime = Carbon::createFromFormat('Y-m-d H:i', $request->booking_date . ' ' . $request->preferred_time);
+        $endTime = $startTime->copy()->addMinutes($duration);
+
+        // Cek tabrakan booking
+        $slotTaken = Booking::where('service_id', $service->id)
+            ->where('booking_date', $bookingDate->toDateString())
+            ->where(function ($query) use ($startTime, $endTime) {
+                $query->where('start_time', '<', $endTime->format('H:i:s'))
+                      ->where('end_time', '>', $startTime->format('H:i:s'));
+            })
+            ->whereHas('bookingStatus', function ($q) {
+                $q->whereNotIn('name', ['Cancelled', 'Rejected']);
+            })
+            ->exists();
+
+        if ($slotTaken) {
+            return back()->withErrors(['slot_booked' => 'Slot sudah diambil. Silakan pilih waktu lain.'])->withInput();
+        }
+
+
+        $dayOfWeek = $bookingDate->dayOfWeek; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+
+$studioSchedule = WeeklySchedule::where('day_of_week', $dayOfWeek)
+    ->where('is_available', true)
+    ->first();
+
+if (!$studioSchedule) {
+    return back()->withErrors(['error' => 'Studio tutup di hari yang dipilih.'])->withInput();
+}
+
+$openTime = Carbon::parse($bookingDate->toDateString() . ' ' . $studioSchedule->start_time);
+$closeTime = Carbon::parse($bookingDate->toDateString() . ' ' . $studioSchedule->end_time);
+
+if ($startTime->lt($openTime) || $endTime->gt($closeTime)) {
+    return back()->withErrors(['slot_invalid' => 'Waktu booking di luar jam operasional studio.'])->withInput();
+}
+
+        if ($startTime->lt($openTime) || $endTime->gt($closeTime)) {
+            return back()->withErrors(['slot_invalid' => 'Waktu booking di luar jam operasional studio.'])->withInput();
+        }
+
+        $totalPrice = $service->price + $package->price;
+        $paymentOption = $request->payment;
+        $dpAmount = $paymentOption === 'dp' ? $totalPrice * 0.5 : null;
+
+        $booking = Booking::create([
+            'booking_code' => 'BOOK-' . strtoupper(Str::random(8)),
+            'customer_name' => $request->full_name,
+            'customer_email' => $request->email,
+            'customer_phone' => $request->phone_number,
+            'service_id' => $service->id,
+            'package_id' => $package->id,
+            'booking_status_id' => BookingStatus::where('name', 'Pending')->first()->id,
+            'booking_date' => $bookingDate->toDateString(),
+            'start_time' => $startTime->format('H:i:s'),
+            'end_time' => $endTime->format('H:i:s'),
+            'total_price' => $totalPrice,
+            'notes' => $request->notes,
+            'payment_option' => $paymentOption,
+            'down_payment_amount' => $dpAmount,
+            'payment_status' => 'pending',
         ]);
 
-        DB::beginTransaction();
-        try {
-            $service = Service::findOrFail($request->service);
-            $package = Package::findOrFail($request->package);
-            $duration = (int) $package->duration_hours;
-            
-            $bookingDate = Carbon::parse($request->preferred_date);
-            $startTime = Carbon::createFromFormat('Y-m-d H:i', $request->preferred_date . ' ' . $request->preferred_time);
-            $endTime = $startTime->copy()->addMinutes($duration);
+        DB::commit();
 
-            // Validasi ulang ketersediaan slot (mencegah race condition)
-            $isSlotStillAvailable = !Booking::where('service', $service->id)
-                ->where('preferred_date', $bookingDate->toDateString())
-                ->where(function ($query) use ($startTime, $endTime) {
-                    $query->where(function ($q) use ($startTime, $endTime) {
-                        $q->where('preferred_time', '<', $endTime->format('H:i:s'))
-                          ->where('end_time', '>', $startTime->format('H:i:s'));
-                    });
-                })
-                ->whereHas('bookingStatus', function ($query) {
-                    $query->whereNotIn('name', ['Cancelled', 'Rejected']);
-                })
-                ->exists();
+        return redirect()->route('booking.success', $booking->id)
+            ->with('success', 'Booking sukses! ID kamu: ' . $booking->booking_code);
 
-            if (!$isSlotStillAvailable) {
-                return back()->withErrors(['slot_booked' => 'Sorry, this time slot has just been filled. Please select another slot.'])->withInput();
-            }
-
-            // Validasi jam operasional studio
-            $studioSchedule = StudioSchedule::where('is_available', true)->first();
-            if ($studioSchedule) {
-                $studioOpenOnBookingDate = Carbon::parse($bookingDate->toDateString() . ' ' . $studioSchedule->start_time);
-                $studioCloseOnBookingDate = Carbon::parse($bookingDate->toDateString() . ' ' . $studioSchedule->end_time);
-                
-                if ($startTime->lt($studioOpenOnBookingDate) || $endTime->gt($studioCloseOnBookingDate)) {
-                    return back()->withErrors(['slot_invalid' => 'Selected booking time is outside studio operating hours.'])->withInput();
-                }
-            } else {
-                return back()->withErrors(['error' => 'Studio schedule not found.'])->withInput();
-            }
-
-            // Ambil status booking awal
-            $pendingStatus = BookingStatus::where('name', 'Pending')->first();
-            if (!$pendingStatus) {
-                // Buat status pending jika belum ada
-                $pendingStatus = BookingStatus::create([
-                    'name' => 'Pending',
-                    'description' => 'Booking is pending confirmation',
-                    'color' => 'yellow'
-                ]);
-            }
-
-            // Hitung total harga
-            $servicePrice = $service->price;
-            $packagePrice = $package->price;
-            $totalPrice = $servicePrice + $packagePrice;
-            
-            // Hitung amount yang harus dibayar berdasarkan pilihan payment
-            $paymentAmount = $request->payment === 'dp' ? $totalPrice * 0.5 : $totalPrice;
-
-            $booking = Booking::create([
-                'user_id' => auth()->id() ?? null, // Null jika guest booking
-                'full_name' => $request->full_name,
-                'email' => $request->email,
-                'phone_number' => $request->phone_number,
-                'service' => $request->service,
-                'package' => $request->package,
-                'preferred_date' => $bookingDate->toDateString(),
-                'preferred_time' => $startTime->format('H:i:s'),
-                'end_time' => $endTime->format('H:i:s'),
-                'total_price' => $totalPrice,
-                'payment_type' => $request->payment,
-                'payment_amount' => $paymentAmount,
-                'booking_status_id' => $pendingStatus->id,
-                'notes' => $request->notes,
-                'payment_due_date' => Carbon::now()->addHours(24), // 24 jam untuk pembayaran
-            ]);
-
-            DB::commit();
-
-            // Redirect ke halaman sukses atau detail booking
-            return redirect()->route('booking.success', $booking->id)
-                ->with('success', 'Booking successful! Your booking ID: ' . $booking->id . '. Please wait for confirmation or proceed with payment.');
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error("Error store booking: " . $e->getMessage() . " - Input: " . json_encode($request->all()));
-            return back()->withErrors(['error' => 'An error occurred while processing your booking. Please try again later.'])->withInput();
-        }
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error("Booking gagal: " . $e->getMessage());
+        return back()->withErrors(['error' => 'Terjadi error saat booking. Coba lagi nanti.'])->withInput();
     }
+}
 
     /**
      * Halaman sukses booking
@@ -303,8 +275,8 @@ class BookingController extends Controller
          ]);
      
          $packages = DB::table('service_packages')
-             ->join('packages', 'service_packages.package', '=', 'packages.id')
-             ->where('service_packages.service', $request->service_id)
+             ->join('packages', 'service_packages.package_id', '=', 'packages.id')
+             ->where('service_packages.service_id', $request->service_id)
              ->where('service_packages.is_active', true)
              ->orderBy('packages.name')
              ->select('packages.id', 'packages.name', 'service_packages.price', 'packages.description')

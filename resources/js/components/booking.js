@@ -2,14 +2,13 @@ export function initBookingSlide() {
     const bookingForm = document.getElementById('booking-form');
     const serviceSelect = document.getElementById('service');
     const packageSelect = document.getElementById('package');
-    const bookingDateInput = document.getElementById('preferred_date');
+    const bookingDateInput = document.getElementById('booking_date');
     const timeSlotSelect = document.getElementById('preferred_time');
     const priceDisplay = document.getElementById('price-display');
     const totalPriceSpan = document.getElementById('total-price');
     const dpInfoDiv = document.getElementById('dp-info');
     const dpAmountSpan = document.getElementById('dp-amount');
 
-    const selectedServiceId = serviceSelect.value;
 
     // Get CSRF token
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
@@ -58,7 +57,7 @@ export function initBookingSlide() {
             }
         } else if (currentStep === 3) {
             fields.push(
-                { id: 'preferred_date', name: 'Preferred Date' },
+                { id: 'booking_date', name: 'Preferred Date' },
                 { id: 'preferred_time', name: 'Preferred Time' }
             );
         }
@@ -223,49 +222,44 @@ export function initBookingSlide() {
         const packageId = packageSelect.value;
         const bookingDate = bookingDateInput.value;
 
-        // Validation
-        if (!serviceId || !bookingDate) {
-            timeSlotSelect.innerHTML = '<option value="">Select service and date first</option>';
+        // Validasi basic
+        if (!serviceId || !packageId || !bookingDate) {
+            timeSlotSelect.innerHTML = '<option value="">Pilih layanan, paket & tanggal dulu</option>';
             timeSlotSelect.disabled = true;
             return;
         }
 
-        if (!slotsUrl) {
-            console.error('Slots URL not found');
-            timeSlotSelect.innerHTML = '<option value="">Configuration error</option>';
-            timeSlotSelect.disabled = true;
-            return;
-        }
-
-        // Date validation
+        // Validasi tanggal (past & max 30 hari)
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const selectedDateObj = new Date(bookingDate + "T00:00:00");
+        const selectedDate = new Date(bookingDate + "T00:00:00");
         const maxDate = new Date(today);
         maxDate.setDate(today.getDate() + 30);
 
-        if (selectedDateObj < today) {
-            timeSlotSelect.innerHTML = '<option value="">Past dates not allowed</option>';
-            timeSlotSelect.disabled = true;
+        if (selectedDate < today) {
+            alert('Ga bisa pilih tanggal yang udah lewat.');
             bookingDateInput.value = '';
-            alert('You cannot select a past date.');
             return;
         }
 
-        if (selectedDateObj > maxDate) {
-            timeSlotSelect.innerHTML = '<option value="">Select date within 30 days</option>';
-            timeSlotSelect.disabled = true;
+        if (selectedDate > maxDate) {
+            alert('Hanya bisa booking maksimal 30 hari ke depan.');
             bookingDateInput.value = '';
-            alert('You can only book up to 30 days in advance.');
             return;
         }
 
-        // Show loading state
-        timeSlotSelect.innerHTML = '<option value="">Loading slots...</option>';
+        // Set loading state
+        timeSlotSelect.innerHTML = '<option value="">Loading slot...</option>';
         timeSlotSelect.disabled = true;
 
+        console.log("Fetching available slots dengan data:", {
+            service: serviceId,
+            package: packageId,
+            date: bookingDate
+        });
+
         try {
-            const response = await fetch(slotsUrl, {
+            const response = await fetch('/booking/slots', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -279,57 +273,63 @@ export function initBookingSlide() {
                 }),
             });
 
+            console.log("HTTP Response status:", response.status); // 👈 aman di sini
+
             if (!response.ok) {
-                let errorData = { error: `Failed to fetch slots (Status: ${response.status})` };
+                let errMsg = 'Gagal fetch slot waktu.';
                 try {
-                    errorData = await response.json();
-                } catch (e) {
-                    // Keep default error message
-                }
-                console.error('Server error:', errorData);
-                populateTimeSlots(errorData);
+                    const errorData = await response.json();
+                    errMsg = errorData?.error || errMsg;
+                } catch (_) { }
+                console.error('Error:', errMsg);
+                populateTimeSlots({ error: errMsg });
                 return;
             }
 
-            const data = await response.json();
-            populateTimeSlots(data);
+            const slots = await response.json();
+            console.log("Slots dari server:", slots); // ✅ tampilkan isi slot
 
-        } catch (error) {
-            console.error('Fetch error:', error);
-            populateTimeSlots({ error: 'Failed to connect to server.' });
+            populateTimeSlots(slots); // <<<<< kemungkinan problem ini setelah ini
+
+        } catch (err) {
+            console.error('Network error:', err);
+            populateTimeSlots({ error: 'Gagal konek ke server.' });
         }
-        console.log({
-            serviceId,
-            packageId,
-            bookingDate,
-          });
     }
 
     function populateTimeSlots(slots) {
-        timeSlotSelect.innerHTML = '<option value="">Select time</option>';
+        timeSlotSelect.innerHTML = '<option value="">Pilih waktu</option>';
 
-        if (slots && typeof slots === 'object' && slots.error) {
-            const option = document.createElement('option');
-            option.textContent = slots.error;
-            option.disabled = true;
-            timeSlotSelect.appendChild(option);
+        if (slots.error) {
+            const opt = document.createElement('option');
+            opt.textContent = slots.error;
+            opt.disabled = true;
+            timeSlotSelect.appendChild(opt);
             timeSlotSelect.disabled = true;
-        } else if (slots && Array.isArray(slots) && slots.length > 0) {
-            slots.forEach(slot => {
-                const option = document.createElement('option');
-                option.value = slot.preferred_time_value;
-                option.textContent = slot.display_time;
-                timeSlotSelect.appendChild(option);
-            });
-            timeSlotSelect.disabled = false;
-        } else {
-            const option = document.createElement('option');
-            option.textContent = 'No slots available';
-            option.disabled = true;
-            timeSlotSelect.appendChild(option);
-            timeSlotSelect.disabled = true;
+            return;
         }
+
+        if (!Array.isArray(slots) || slots.length === 0) {
+            const opt = document.createElement('option');
+            opt.textContent = 'Slot kosong semua 😭';
+            opt.disabled = true;
+            timeSlotSelect.appendChild(opt);
+            timeSlotSelect.disabled = true;
+            return;
+        }
+
+        // Kalau aman
+        slots.forEach(slot => {
+            const opt = document.createElement('option');
+            opt.value = slot.start; // misal "09:00"
+            opt.textContent = `${slot.start} - ${slot.end}`; // misal "09:00 - 10:00"
+            timeSlotSelect.appendChild(opt);
+        });
+
+        timeSlotSelect.disabled = false;
     }
+
+
 
     // Event listeners
     if (serviceSelect) {
@@ -341,6 +341,7 @@ export function initBookingSlide() {
 
     if (packageSelect) {
         packageSelect.addEventListener('change', updatePrice);
+        packageSelect.addEventListener('change', fetchAvailableSlots);
     }
 
     if (bookingDateInput) {
@@ -355,19 +356,20 @@ export function initBookingSlide() {
     // Form submission validation
     if (bookingForm) {
         bookingForm.addEventListener('submit', function (event) {
+            console.log("Form method:", bookingForm.method);  // Should be POST
+            console.log("Form action:", bookingForm.action);  // Should point to booking.store
+
             if (!validateStep(3)) {
                 event.preventDefault();
                 return;
             }
 
-            // Additional validation for time slot
             if (timeSlotSelect.disabled || !timeSlotSelect.value) {
                 alert('Please select a valid time slot.');
                 event.preventDefault();
                 return;
             }
 
-            // Show loading state on submit button
             const submitBtn = document.querySelector('button[type="submit"]');
             if (submitBtn) {
                 submitBtn.disabled = true;

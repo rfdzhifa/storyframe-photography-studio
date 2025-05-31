@@ -23,8 +23,8 @@ class ServicePackage extends Pivot
      * @var array<int, string>
      */
     protected $fillable = [
-        'service',
-        'package',
+        'service_id',
+        'package_id',
         'price',
         'is_active',
     ];
