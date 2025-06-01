@@ -264,53 +264,6 @@ class BookingController extends Controller
 }
 
     /**
-     * Menampilkan detail booking berdasarkan ID atau booking code
-     */
-    public function show($id)
-    {
-        $booking = Booking::with(['service', 'package', 'bookingStatus'])
-            ->where('id', $id)
-            ->orWhere('booking_code', $id)
-            ->firstOrFail();
-
-        // Check authorization jika diperlukan
-        if (auth()->check() && auth()->id() !== $booking->user_id) {
-            abort(403, 'Unauthorized access to booking details.');
-        }
-
-        return view('pages.booking_detail', compact('booking'));
-    }
-
-    /**
-     * Membatalkan booking
-     */
-    public function cancel(Request $request, Booking $booking)
-    {
-        // Check authorization
-        if (auth()->check() && auth()->id() !== $booking->user_id) {
-            abort(403, 'Unauthorized action.');
-        }
-
-        $cancelledStatus = BookingStatus::where('name', 'Cancelled')->first();
-        if (!$cancelledStatus) {
-            $cancelledStatus = BookingStatus::create([
-                'name' => 'Cancelled',
-                'description' => 'Booking has been cancelled',
-                'color' => 'red'
-            ]);
-        }
-
-        $booking->update([
-            'booking_status_id' => $cancelledStatus->id,
-            'cancelled_at' => now(),
-            'cancellation_reason' => $request->input('reason', 'Cancelled by customer')
-        ]);
-
-        return redirect()->route('booking.show', $booking->id)
-            ->with('success', 'Booking has been cancelled successfully.');
-    }
-
-    /**
      * API untuk mendapatkan packages berdasarkan service
      */
     
