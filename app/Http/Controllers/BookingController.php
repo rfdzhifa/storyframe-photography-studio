@@ -129,7 +129,7 @@ class BookingController extends Controller
         $startTime = Carbon::createFromFormat('Y-m-d H:i', $request->booking_date . ' ' . $request->preferred_time);
         $endTime = $startTime->copy()->addMinutes($duration);
 
-        // Cek tabrakan booking
+        // Check booking collision
         $slotTaken = Booking::where('service_id', $service->id)
             ->where('booking_date', $bookingDate->toDateString())
             ->where(function ($query) use ($startTime, $endTime) {
@@ -142,32 +142,35 @@ class BookingController extends Controller
             ->exists();
 
         if ($slotTaken) {
-            return back()->withErrors(['slot_booked' => 'Slot sudah diambil. Silakan pilih waktu lain.'])->withInput();
+            throw new \Exception('Slot sudah diambil. Silakan pilih waktu lain.');
         }
 
+        $dayOfWeek = $bookingDate->dayOfWeek;
 
-        $dayOfWeek = $bookingDate->dayOfWeek; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+        $studioSchedule = WeeklySchedule::where('day_of_week', $dayOfWeek)
+            ->where('is_available', true)
+            ->first();
 
-$studioSchedule = WeeklySchedule::where('day_of_week', $dayOfWeek)
-    ->where('is_available', true)
-    ->first();
-
-if (!$studioSchedule) {
-    return back()->withErrors(['error' => 'Studio tutup di hari yang dipilih.'])->withInput();
-}
-
-$openTime = Carbon::parse($bookingDate->toDateString() . ' ' . $studioSchedule->start_time);
-$closeTime = Carbon::parse($bookingDate->toDateString() . ' ' . $studioSchedule->end_time);
-
-if ($startTime->lt($openTime) || $endTime->gt($closeTime)) {
-    return back()->withErrors(['slot_invalid' => 'Waktu booking di luar jam operasional studio.'])->withInput();
-}
-
-        if ($startTime->lt($openTime) || $endTime->gt($closeTime)) {
-            return back()->withErrors(['slot_invalid' => 'Waktu booking di luar jam operasional studio.'])->withInput();
+        if (!$studioSchedule) {
+            throw new \Exception('Studio tutup di hari yang dipilih.');
         }
 
-        $totalPrice = $service->price + $package->price;
+        $pendingStatus = BookingStatus::where('name', 'Pending')->first();
+        if (!$pendingStatus) {
+            throw new \Exception('BookingStatus "Pending" tidak ditemukan!');
+        }
+        
+        $pivotPrice = DB::table('service_packages')
+    ->where('service_id', $service->id)
+    ->where('package_id', $package->id)
+    ->value('price');
+
+    if ($pivotPrice === null) {
+        throw new \Exception('Harga kombinasi service & package tidak ditemukan.');
+    }
+
+
+        $totalPrice = (float) $pivotPrice;
         $paymentOption = $request->payment;
         $dpAmount = $paymentOption === 'dp' ? $totalPrice * 0.5 : null;
 
@@ -178,7 +181,7 @@ if ($startTime->lt($openTime) || $endTime->gt($closeTime)) {
             'customer_phone' => $request->phone_number,
             'service_id' => $service->id,
             'package_id' => $package->id,
-            'booking_status_id' => BookingStatus::where('name', 'Pending')->first()->id,
+            'booking_status_id' => $pendingStatus->id,
             'booking_date' => $bookingDate->toDateString(),
             'start_time' => $startTime->format('H:i:s'),
             'end_time' => $endTime->format('H:i:s'),
@@ -191,31 +194,74 @@ if ($startTime->lt($openTime) || $endTime->gt($closeTime)) {
 
         DB::commit();
 
-        return redirect()->route('booking.success', $booking->id)
-            ->with('success', 'Booking sukses! ID kamu: ' . $booking->booking_code);
+        $redirectUrl = route('booking.success', ['booking' => $booking->id]);
+
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Booking sukses! ID kamu: ' . $booking->booking_code,
+                'data' => [
+                    'booking_id' => $booking->id,
+                    'booking_code' => $booking->booking_code,
+                    'redirect_url' => $redirectUrl
+                ]
+            ], 200);
+        }
+
+        return redirect()->route('booking.success', ['booking' => $booking->id])
+    ->with('success', 'Booking sukses! ID kamu: ' . $booking->booking_code);
+
 
     } catch (\Exception $e) {
-        DB::rollBack();
+
+        // Super verbose logging biar jelas banget errornya apa
         Log::error("Booking gagal: " . $e->getMessage());
-        return back()->withErrors(['error' => 'Terjadi error saat booking. Coba lagi nanti.'])->withInput();
+        Log::error($e->getTraceAsString());
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi error saat booking: ' . $e->getMessage(),
+                'errors' => ['error' => $e->getMessage()]
+            ], 500);
+        }
+
+        return back()->withErrors(['error' => 'Terjadi error saat booking: ' . $e->getMessage()])->withInput();
     }
 }
+
+
 
     /**
      * Halaman sukses booking
      */
     public function success(Booking $booking)
-    {
-        // Pastikan user yang mengakses adalah pemilik booking (untuk user yang login)
-        // atau tampilkan untuk semua jika guest booking
-        if (auth()->check() && auth()->id() !== $booking->user_id) {
-            abort(403, 'Unauthorized access to booking details.');
-        }
-
-        $booking->load(['service', 'package', 'bookingStatus']);
-        
-        return view('pages.booking_success', compact('booking'));
-    }
+{
+    // Load relasi yang dibutuhkan
+    $booking->load(['service', 'package', 'bookingStatus']);
+    
+    // Format data untuk tampilan
+    $bookingData = [
+        'booking_code' => $booking->booking_code,
+        'customer_name' => $booking->customer_name,
+        'customer_email' => $booking->customer_email,
+        'customer_phone' => $booking->customer_phone,
+        'service_name' => $booking->service->name,
+        'package_name' => $booking->package->name,
+        'booking_date' => Carbon::parse($booking->booking_date)->format('d F Y'),
+        'start_time' => Carbon::parse($booking->start_time)->format('H:i'),
+        'end_time' => Carbon::parse($booking->end_time)->format('H:i'),
+        'total_price' => number_format($booking->total_price, 0, ',', '.'),
+        'payment_option' => $booking->payment_option === 'dp' ? 'Down Payment (50%)' : 'Full Payment',
+        'down_payment_amount' => $booking->down_payment_amount ? number_format($booking->down_payment_amount, 0, ',', '.') : null,
+        'status' => $booking->bookingStatus->name,
+        'notes' => $booking->notes,
+        'created_at' => $booking->created_at->format('d F Y, H:i')
+    ];
+    
+    return view('pages.success', compact('booking', 'bookingData'));
+}
 
     /**
      * Menampilkan detail booking berdasarkan ID atau booking code
