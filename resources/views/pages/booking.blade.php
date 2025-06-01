@@ -6,7 +6,7 @@
 
 @section('content')
 
-  <form id="booking-form" action="{{ route('booking.store') }}" method="POST">
+  <form id="booking-form" data-url="{{ route('booking.store') }}" method="POST">
     @csrf
 
     <!-- Step 1: Contact Information -->
@@ -230,7 +230,7 @@
       </svg>
       Previous
       </button>
-      <button type="submit"
+      <button id="submit-button" type="submit"
       class="inline-flex items-center gap-2 rounded-full bg-gray-900 px-6 py-2 text-sm font-medium text-white hover:bg-gray-800 transition">
       Book Now
       <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">

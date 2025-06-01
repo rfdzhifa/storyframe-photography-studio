@@ -1,5 +1,12 @@
 export function initBookingSlide() {
+    if (window.bookingSlideInitialized) {
+        console.log('[Booking Init] Skipping init, already initialized.');
+        return;
+    }
+    window.bookingSlideInitialized = true;
+
     const bookingForm = document.getElementById('booking-form');
+    const submitBtn = document.getElementById('submit-button');
     const serviceSelect = document.getElementById('service');
     const packageSelect = document.getElementById('package');
     const bookingDateInput = document.getElementById('booking_date');
@@ -9,13 +16,16 @@ export function initBookingSlide() {
     const dpInfoDiv = document.getElementById('dp-info');
     const dpAmountSpan = document.getElementById('dp-amount');
 
-
     // Get CSRF token
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
         document.querySelector('input[name="_token"]')?.value;
 
     // URL untuk mengambil slot dari form data attribute
     const slotsUrl = bookingForm?.dataset.slotsUrl || '';
+
+    // State management
+    let isFetchingSlots = false;
+    let fetchSlotsTimeout = null;
 
     function validateStep(currentStep) {
         const fields = [];
@@ -115,6 +125,14 @@ export function initBookingSlide() {
         return 1; // default
     }
 
+    function debounce(func, delay = 300) {
+        let timeout;
+        return function (...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), delay);
+        };
+    }
+
     function loadPackages() {
         const serviceId = serviceSelect.value;
 
@@ -139,7 +157,7 @@ export function initBookingSlide() {
                 return response.json();
             })
             .then(data => {
-                console.log('Packages:', data);
+                console.log('Packages loaded:', data.length);
 
                 packageSelect.innerHTML = '<option value="">Select a package</option>';
 
@@ -153,15 +171,15 @@ export function initBookingSlide() {
                 });
 
                 packageSelect.disabled = false;
-                updatePrice();
+                // DON'T call updatePrice here - let the change event handle it
             })
             .catch(error => {
                 console.error('Error fetching packages:', error);
                 packageSelect.innerHTML = '<option value="">Failed to load packages</option>';
                 packageSelect.disabled = true;
+                hidePrice();
             });
     }
-
 
     function updatePrice() {
         const serviceId = serviceSelect.value;
@@ -218,18 +236,26 @@ export function initBookingSlide() {
     }
 
     async function fetchAvailableSlots() {
+        if (isFetchingSlots) {
+            console.log("Already fetching slots, skipping...");
+            return; // Prevent spam calls
+        }
+
         const serviceId = serviceSelect.value;
         const packageId = packageSelect.value;
         const bookingDate = bookingDateInput.value;
 
-        // Validasi basic
+        console.log("fetchAvailableSlots called with:", { serviceId, packageId, bookingDate });
+
+        // Basic validation
         if (!serviceId || !packageId || !bookingDate) {
+            console.log("Missing required fields, resetting time slots");
             timeSlotSelect.innerHTML = '<option value="">Pilih layanan, paket & tanggal dulu</option>';
             timeSlotSelect.disabled = true;
             return;
         }
 
-        // Validasi tanggal (past & max 30 hari)
+        // Date validation (past & max 30 days)
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const selectedDate = new Date(bookingDate + "T00:00:00");
@@ -258,6 +284,8 @@ export function initBookingSlide() {
             date: bookingDate
         });
 
+        isFetchingSlots = true;
+
         try {
             const response = await fetch('/booking/slots', {
                 method: 'POST',
@@ -273,8 +301,6 @@ export function initBookingSlide() {
                 }),
             });
 
-            console.log("HTTP Response status:", response.status); // 👈 aman di sini
-
             if (!response.ok) {
                 let errMsg = 'Gagal fetch slot waktu.';
                 try {
@@ -287,13 +313,15 @@ export function initBookingSlide() {
             }
 
             const slots = await response.json();
-            console.log("Slots dari server:", slots); // ✅ tampilkan isi slot
+            console.log("Slots dari server:", slots);
 
-            populateTimeSlots(slots); // <<<<< kemungkinan problem ini setelah ini
+            populateTimeSlots(slots);
 
         } catch (err) {
             console.error('Network error:', err);
             populateTimeSlots({ error: 'Gagal konek ke server.' });
+        } finally {
+            isFetchingSlots = false;
         }
     }
 
@@ -318,34 +346,52 @@ export function initBookingSlide() {
             return;
         }
 
-        // Kalau aman
+        // Populate available slots
         slots.forEach(slot => {
             const opt = document.createElement('option');
-            opt.value = slot.start; // misal "09:00"
-            opt.textContent = `${slot.start} - ${slot.end}`; // misal "09:00 - 10:00"
+            opt.value = slot.start; // e.g. "09:00"
+            opt.textContent = `${slot.start} - ${slot.end}`; // e.g. "09:00 - 10:00"
             timeSlotSelect.appendChild(opt);
         });
 
         timeSlotSelect.disabled = false;
     }
 
+    // Single comprehensive handler for all changes that affect slots
+    function handleSlotDependencyChange(source = 'unknown') {
+        console.log(`handleSlotDependencyChange called from: ${source}`);
 
+        // Clear any existing timeout first
+        clearTimeout(fetchSlotsTimeout);
 
-    // Event listeners
+        // Set new timeout for debounced execution
+        fetchSlotsTimeout = setTimeout(() => {
+            fetchAvailableSlots();
+        }, 300);
+    }
+
+    // Event listeners - consolidated to prevent multiple calls
     if (serviceSelect) {
         serviceSelect.addEventListener('change', function () {
-            loadPackages();
-            fetchAvailableSlots();
+            console.log('Service changed, loading packages...');
+            loadPackages(); // This will also call updatePrice internally
+            handleSlotDependencyChange('service-change');
         });
     }
 
     if (packageSelect) {
-        packageSelect.addEventListener('change', updatePrice);
-        packageSelect.addEventListener('change', fetchAvailableSlots);
+        packageSelect.addEventListener('change', function () {
+            console.log('Package changed, updating price...');
+            updatePrice();
+            handleSlotDependencyChange('package-change');
+        });
     }
 
     if (bookingDateInput) {
-        bookingDateInput.addEventListener('change', fetchAvailableSlots);
+        bookingDateInput.addEventListener('change', function () {
+            console.log('Date changed...');
+            handleSlotDependencyChange('date-change');
+        });
     }
 
     // Payment radio buttons
@@ -355,46 +401,112 @@ export function initBookingSlide() {
 
     // Form submission validation
     if (bookingForm) {
-        bookingForm.addEventListener('submit', function (event) {
-            console.log("Form method:", bookingForm.method);  // Should be POST
-            console.log("Form action:", bookingForm.action);  // Should point to booking.store
+        bookingForm.addEventListener('submit', function (e) {
+            e.preventDefault(); // Prevent page reload
 
-            if (!validateStep(3)) {
-                event.preventDefault();
-                return;
-            }
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Processing...';
 
-            if (timeSlotSelect.disabled || !timeSlotSelect.value) {
-                alert('Please select a valid time slot.');
-                event.preventDefault();
-                return;
-            }
+            const formData = new FormData(bookingForm);
+            const formAction = bookingForm.getAttribute('data-url');
 
-            const submitBtn = document.querySelector('button[type="submit"]');
-            if (submitBtn) {
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = `
-                    <svg class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Processing...
-                `;
-            }
+            fetch(formAction, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value,
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest', // Important for Laravel AJAX detection
+                },
+                body: formData
+            })
+                .then(async response => {
+                    // Parse JSON response regardless of status
+                    const text = await response.text();
+                    console.log('RAW response:', text);
+
+                    let data;
+                    try {
+                        data = JSON.parse(text);
+                    } catch (err) {
+                        console.error('Gagal parse JSON:', err);
+                        throw new Error('Response bukan JSON valid');
+                    }
+
+                    if (!response.ok) {
+                        // Handle validation errors (422) or server errors (500)
+                        console.error("Error Response:", data);
+
+                        // Show specific error messages if available
+                        if (data.message) {
+                            alert(data.message);
+                        } else if (data.errors) {
+                            // Display first error message
+                            const firstError = Object.values(data.errors)[0];
+                            alert(Array.isArray(firstError) ? firstError[0] : firstError);
+                        } else {
+                            alert("Gagal booking. Cek inputmu!");
+                        }
+
+                        // Log all errors for debugging
+                        if (data.errors) {
+                            console.log("Validation errors:", data.errors);
+                        }
+
+                        throw new Error(`HTTP ${response.status}: ${data.message || 'Request failed'}`);
+                    }
+
+                    return data;
+                })
+                .then(data => {
+                    console.log("Booking sukses:", data);
+
+                    // Show success message
+                    if (data.message) {
+                        alert(data.message);
+                    } else {
+                        alert('Booking sukses!');
+                    }
+
+                    // Redirect using the URL from server response if available
+                    if (data.data && data.data.redirect_url) {
+                        window.location.href = data.data.redirect_url;
+                    } else {
+                        // Fallback redirect
+                        window.location.href = `/booking`;
+                    }
+                })
+                .catch(err => {
+                    console.error("Booking gagal:", err);
+
+                    // Only show alert if we haven't already shown one above
+                    if (!err.message.includes('HTTP')) {
+                        alert("Terjadi error saat booking. Silakan coba lagi.");
+                    }
+                })
+                .finally(() => {
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = 'Submit';
+                });
         });
     }
 
     // Initialize on page load
+    console.log('Initializing booking slide...');
     if (serviceSelect && serviceSelect.value) {
+        console.log('Service pre-selected, loading packages...');
         loadPackages();
-        if (bookingDateInput && bookingDateInput.value) {
-            fetchAvailableSlots();
-        }
     }
 
-    // Handle old input values
+    // Handle old input values - separate initialization
     if (packageSelect && packageSelect.value) {
+        console.log('Package pre-selected, updating price...');
         updatePrice();
+    }
+
+    // Only fetch slots if ALL required fields are pre-filled
+    if (serviceSelect?.value && packageSelect?.value && bookingDateInput?.value) {
+        console.log('All fields pre-filled, fetching slots...');
+        handleSlotDependencyChange('initialization');
     }
 
     // Handle old payment selection
