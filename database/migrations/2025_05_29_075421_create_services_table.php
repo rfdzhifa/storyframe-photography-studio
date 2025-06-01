@@ -11,11 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('studio_schedules', function (Blueprint $table) {
+        Schema::create('services', function (Blueprint $table) {
             $table->id();
-            $table->tinyInteger('day_of_week'); // 0=Sun,1=Mon,...
-            $table->time('open_time')->nullable();
-            $table->time('close_time')->nullable();
+            $table->string('name');
+            $table->text('description')->nullable();
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
     }
@@ -25,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('studio_schedules');
+        Schema::dropIfExists('services');
     }
 };
