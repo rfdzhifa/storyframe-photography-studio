@@ -56,4 +56,10 @@ class Booking extends Model
     {
         return $this->start_time < $end && $this->end_time > $start;
     }
+    
+    public function getRouteKeyName()
+    {
+        return 'booking_code';
+    }
+
 }

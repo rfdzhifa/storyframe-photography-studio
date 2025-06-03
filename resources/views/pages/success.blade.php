@@ -51,7 +51,7 @@
             <div class="text-center mb-8">
                 <div
                     class="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4 animate-pulse-slow">
-                    <i class="fas fa-check text-3xl text-green-500"></i>
+                    <i class="fas fa-check text-3xl text-green-500">🎉</i>
                 </div>
                 <h1 class="text-3xl font-bold text-gray-800 mb-2">Booking Berhasil!</h1>
                 <p class="text-gray-600">Terima kasih telah mempercayai layanan kami</p>
@@ -159,7 +159,8 @@
                                     <div class="flex-1">
                                         <p class="text-sm text-gray-600">Waktu</p>
                                         <p class="font-medium text-gray-800">{{ $bookingData['start_time'] }} -
-                                            {{ $bookingData['end_time'] }}</p>
+                                            {{ $bookingData['end_time'] }}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -253,85 +254,3 @@
         </div>
     </div>
 @endsection
-
-@push('scripts')
-    <script>
-        function shareBooking() {
-            const bookingCode = '{{ $bookingData["booking_code"] }}';
-            const customerName = '{{ $bookingData["customer_name"] }}';
-            const bookingDate = '{{ $bookingData["booking_date"] }}';
-            const serviceTime = '{{ $bookingData["start_time"] }} - {{ $bookingData["end_time"] }}';
-
-            const text = `🎉 Booking Berhasil!\n\n` +
-                `📋 Kode: ${bookingCode}\n` +
-                `👤 Nama: ${customerName}\n` +
-                `📅 Tanggal: ${bookingDate}\n` +
-                `⏰ Waktu: ${serviceTime}\n\n` +
-                `Terima kasih telah mempercayai layanan kami! 🙏`;
-
-            if (navigator.share) {
-                navigator.share({
-                    title: 'Detail Booking Studio',
-                    text: text,
-                    url: window.location.href
-                }).catch(err => {
-                    console.log('Error sharing:', err);
-                    fallbackShare(text);
-                });
-            } else {
-                fallbackShare(text);
-            }
-        }
-
-        function fallbackShare(text) {
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(text).then(() => {
-                    showNotification('Detail booking berhasil disalin ke clipboard! 📋');
-                }).catch(() => {
-                    showNotification('Tidak dapat menyalin otomatis. Silakan salin manual.');
-                });
-            } else {
-                // Create temporary textarea for older browsers
-                const textarea = document.createElement('textarea');
-                textarea.value = text;
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-                showNotification('Detail booking berhasil disalin! 📋');
-            }
-        }
-
-        function showNotification(message) {
-            // Create notification element
-            const notification = document.createElement('div');
-            notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 transform translate-x-full transition-transform duration-300';
-            notification.innerHTML = `
-                <div class="flex items-center space-x-2">
-                    <i class="fas fa-check-circle"></i>
-                    <span>${message}</span>
-                </div>
-            `;
-
-            document.body.appendChild(notification);
-
-            // Show notification
-            setTimeout(() => {
-                notification.classList.remove('translate-x-full');
-            }, 100);
-
-            // Hide notification after 3 seconds
-            setTimeout(() => {
-                notification.classList.add('translate-x-full');
-                setTimeout(() => {
-                    document.body.removeChild(notification);
-                }, 300);
-            }, 3000);
-        }
-
-        // Auto scroll to top when page loads
-        window.addEventListener('load', () => {
-            window.scrollTo(0, 0);
-        });
-    </script>
-@endpush

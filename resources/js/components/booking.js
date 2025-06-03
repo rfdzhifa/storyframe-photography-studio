@@ -50,9 +50,18 @@ export function initBookingSlide() {
             if (emailField.value.trim() && !isValidEmail(emailField.value)) {
                 emailField.classList.remove('border-gray-300');
                 emailField.classList.add('border-red-500');
-                alert('Please enter a valid email address');
+                alert('Masukkan alamat email yang valid.');
                 isValid = false;
             }
+
+            const phoneField = document.getElementById('phone_number');
+            if (phoneField.value.trim() && !isValidPhone(phoneField.value.trim())) {
+                phoneField.classList.remove('border-gray-300');
+                phoneField.classList.add('border-red-500');
+                alert('Masukkan nomor telepon valid dengan kode negara, panjang 10–15 digit.');
+                isValid = false;
+            }
+
         } else if (currentStep === 2) {
             fields.push(
                 { id: 'service', name: 'Service' },
@@ -62,7 +71,7 @@ export function initBookingSlide() {
             // Check radio buttons for payment
             const paymentSelected = document.querySelector('input[name="payment"]:checked');
             if (!paymentSelected) {
-                alert('Please select a payment option');
+                alert('Mohon pilih opsi pembayaran.');
                 isValid = false;
             }
         } else if (currentStep === 3) {
@@ -88,11 +97,18 @@ export function initBookingSlide() {
 
         // Show alert if there are empty fields
         if (emptyFields.length > 0) {
-            alert(`Please fill in the following fields:\n- ${emptyFields.join('\n- ')}`);
+            alert(`Harap lengkapi kolom berikut:\n- ${emptyFields.join('\n- ')}`);
         }
 
         return isValid;
     }
+
+    function isValidPhone(phone) {
+        const cleaned = phone.replace(/[\s.-]/g, '');
+        const regex = /^\+?[1-9]\d{7,14}$/;
+        return regex.test(cleaned);
+    }
+
 
     function isValidEmail(email) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -125,19 +141,11 @@ export function initBookingSlide() {
         return 1; // default
     }
 
-    function debounce(func, delay = 300) {
-        let timeout;
-        return function (...args) {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => func.apply(this, args), delay);
-        };
-    }
-
     function loadPackages() {
         const serviceId = serviceSelect.value;
 
         if (!serviceId) {
-            packageSelect.innerHTML = '<option value="">Select a service first</option>';
+            packageSelect.innerHTML = '<option value="">Pilih layanan terlebih dahulu</option>';
             packageSelect.disabled = true;
             hidePrice();
             return;
@@ -159,7 +167,7 @@ export function initBookingSlide() {
             .then(data => {
                 console.log('Packages loaded:', data.length);
 
-                packageSelect.innerHTML = '<option value="">Select a package</option>';
+                packageSelect.innerHTML = '<option value="">Pilih paket</option>';
 
                 data.forEach(pkg => {
                     const option = document.createElement('option');
@@ -175,7 +183,7 @@ export function initBookingSlide() {
             })
             .catch(error => {
                 console.error('Error fetching packages:', error);
-                packageSelect.innerHTML = '<option value="">Failed to load packages</option>';
+                packageSelect.innerHTML = '<option value="">Gagal memuat paket</option>';
                 packageSelect.disabled = true;
                 hidePrice();
             });
@@ -399,96 +407,127 @@ export function initBookingSlide() {
         radio.addEventListener('change', toggleDpInfo);
     });
 
+    function showConfirmModal() {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('confirmModal');
+            const yesBtn = document.getElementById('confirmYes');
+            const noBtn = document.getElementById('confirmNo');
+
+            // Show modal
+            modal.classList.remove('hidden');
+
+            function cleanUp() {
+                modal.classList.add('hidden');
+                yesBtn.removeEventListener('click', onYes);
+                noBtn.removeEventListener('click', onNo);
+            }
+
+            function onYes() {
+                cleanUp();
+                resolve(true);
+            }
+
+            function onNo() {
+                cleanUp();
+                resolve(false);
+            }
+
+            yesBtn.addEventListener('click', onYes);
+            noBtn.addEventListener('click', onNo);
+        });
+    }
+
+
+
     // Form submission validation
     if (bookingForm) {
         bookingForm.addEventListener('submit', function (e) {
             e.preventDefault(); // Prevent page reload
 
-            submitBtn.disabled = true;
-            submitBtn.innerText = 'Processing...';
+            showConfirmModal().then(confirmed => {
+                if (!confirmed) {
+                    // User batal submit, langsung return
+                    return;
+                }
 
-            const formData = new FormData(bookingForm);
-            const formAction = bookingForm.getAttribute('data-url');
+                submitBtn.disabled = true;
+                submitBtn.innerText = 'Processing...';
 
-            fetch(formAction, {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value,
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest', // Important for Laravel AJAX detection
-                },
-                body: formData
-            })
-                .then(async response => {
-                    // Parse JSON response regardless of status
-                    const text = await response.text();
-                    console.log('RAW response:', text);
+                const formData = new FormData(bookingForm);
+                const formAction = bookingForm.getAttribute('data-url');
 
-                    let data;
-                    try {
-                        data = JSON.parse(text);
-                    } catch (err) {
-                        console.error('Gagal parse JSON:', err);
-                        throw new Error('Response bukan JSON valid');
-                    }
+                fetch(formAction, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value,
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: formData
+                })
+                    .then(async response => {
+                        const text = await response.text();
+                        console.log('RAW response:', text);
 
-                    if (!response.ok) {
-                        // Handle validation errors (422) or server errors (500)
-                        console.error("Error Response:", data);
+                        let data;
+                        try {
+                            data = JSON.parse(text);
+                        } catch (err) {
+                            console.error('Gagal parse JSON:', err);
+                            throw new Error('Response bukan JSON valid');
+                        }
 
-                        // Show specific error messages if available
+                        if (!response.ok) {
+                            console.error("Error Response:", data);
+
+                            if (data.message) {
+                                alert(data.message);
+                            } else if (data.errors) {
+                                const firstError = Object.values(data.errors)[0];
+                                alert(Array.isArray(firstError) ? firstError[0] : firstError);
+                            } else {
+                                alert("Gagal booking. Cek inputmu!");
+                            }
+
+                            if (data.errors) {
+                                console.log("Validation errors:", data.errors);
+                            }
+
+                            throw new Error(`HTTP ${response.status}: ${data.message || 'Request failed'}`);
+                        }
+
+                        return data;
+                    })
+                    .then(data => {
+                        console.log("Booking sukses:", data);
+
                         if (data.message) {
                             alert(data.message);
-                        } else if (data.errors) {
-                            // Display first error message
-                            const firstError = Object.values(data.errors)[0];
-                            alert(Array.isArray(firstError) ? firstError[0] : firstError);
                         } else {
-                            alert("Gagal booking. Cek inputmu!");
+                            alert('Booking sukses!');
                         }
 
-                        // Log all errors for debugging
-                        if (data.errors) {
-                            console.log("Validation errors:", data.errors);
+                        if (data.data && data.data.redirect_url) {
+                            window.location.href = data.data.redirect_url;
+                        } else {
+                            window.location.href = `/booking`;
                         }
+                    })
+                    .catch(err => {
+                        console.error("Booking gagal:", err);
 
-                        throw new Error(`HTTP ${response.status}: ${data.message || 'Request failed'}`);
-                    }
-
-                    return data;
-                })
-                .then(data => {
-                    console.log("Booking sukses:", data);
-
-                    // Show success message
-                    if (data.message) {
-                        alert(data.message);
-                    } else {
-                        alert('Booking sukses!');
-                    }
-
-                    // Redirect using the URL from server response if available
-                    if (data.data && data.data.redirect_url) {
-                        window.location.href = data.data.redirect_url;
-                    } else {
-                        // Fallback redirect
-                        window.location.href = `/booking`;
-                    }
-                })
-                .catch(err => {
-                    console.error("Booking gagal:", err);
-
-                    // Only show alert if we haven't already shown one above
-                    if (!err.message.includes('HTTP')) {
-                        alert("Terjadi error saat booking. Silakan coba lagi.");
-                    }
-                })
-                .finally(() => {
-                    submitBtn.disabled = false;
-                    submitBtn.innerText = 'Submit';
-                });
+                        if (!err.message.includes('HTTP')) {
+                            alert("Terjadi error saat booking. Silakan coba lagi.");
+                        }
+                    })
+                    .finally(() => {
+                        submitBtn.disabled = false;
+                        submitBtn.innerText = 'Submit';
+                    });
+            });
         });
     }
+
 
     // Initialize on page load
     console.log('Initializing booking slide...');

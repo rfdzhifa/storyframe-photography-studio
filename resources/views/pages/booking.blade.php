@@ -14,7 +14,7 @@
     class="full-page-section w-full min-h-screen py-16 bg-zinc-100 flex flex-col justify-between items-center px-4 md:px-40">
 
     <div class="w-full">
-      <h2 class="text-center text-gray-900 text-2xl md:text-4xl font-medium mb-10">
+      <h2 class="text-center text-gray-900 text-2xl md:text-4xl font-medium mb-8">
       READY TO CAPTURE<br>YOUR STORY?
       </h2>
 
@@ -75,7 +75,7 @@
     class="full-page-section w-full min-h-screen py-16 bg-zinc-100 flex flex-col justify-between items-center px-4 md:px-40 hidden">
 
     <div class="w-full">
-      <h2 class="text-center text-gray-900 text-2xl md:text-4xl font-medium mb-10">
+      <h2 class="text-center text-gray-900 text-2xl md:text-4xl font-medium mb-8">
       CHOOSE YOUR<br>PACKAGE
       </h2>
 
@@ -177,7 +177,7 @@
     class="full-page-section w-full min-h-screen py-16 bg-zinc-100 flex flex-col justify-between items-center px-4 md:px-40 hidden">
 
     <div class="w-full">
-      <h2 class="text-center text-gray-900 text-2xl md:text-4xl font-medium mb-10">
+      <h2 class="text-center text-gray-900 text-2xl md:text-4xl font-medium mb-8">
       SCHEDULE YOUR<br>SESSION
       </h2>
 
@@ -241,4 +241,42 @@
     </section>
 
   </form>
+
+  <div id="confirmModal" class="relative z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <!-- Backdrop -->
+    <div class="fixed inset-0 bg-gray-500/75 transition-opacity" aria-hidden="true"></div>
+
+    <!-- Modal wrapper -->
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
+    <div
+      class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:max-w-lg w-full">
+      <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+      <div class="sm:flex sm:items-start">
+        <div
+        class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-yellow-100 sm:mx-0 sm:h-10 sm:w-10">
+        <svg class="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M12 9v3m0 4h.01m-6.938 4h13.856c1.121 0 1.993-1.006 1.791-2.105l-1.72-9.591A2 2 0 0017.01 8H6.99a2 2 0 00-1.978 1.695l-1.72 9.59A2 2 0 004.07 20z" />
+        </svg>
+        </div>
+        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+        <h3 class="text-lg font-medium text-gray-900" id="modal-title">Konfirmasi Pemesanan</h3>
+        <div class="mt-2">
+          <p class="text-sm text-gray-500">Yakin mau lanjutkan pemesanan ini? Pastikan semua datanya udah bener ya!
+          </p>
+        </div>
+        </div>
+      </div>
+      </div>
+      <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+      <button id="confirmYes" type="button"
+        class="inline-flex w-full justify-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 sm:ml-3 sm:w-auto">Ya,
+        lanjut</button>
+      <button id="confirmNo" type="button"
+        class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 sm:mt-0 sm:w-auto">Batal</button>
+      </div>
+    </div>
+    </div>
+  </div>
+
 @endsection
