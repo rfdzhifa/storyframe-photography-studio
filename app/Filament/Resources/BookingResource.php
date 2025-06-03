@@ -12,6 +12,9 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Carbon\Carbon;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 
 class BookingResource extends Resource
 {
@@ -27,12 +30,91 @@ class BookingResource extends Resource
             Forms\Components\TextInput::make('customer_name')->required(),
             Forms\Components\TextInput::make('customer_email')->email()->required(),
             Forms\Components\TextInput::make('customer_phone')->required(),
-            Forms\Components\Select::make('service_id')->relationship('service', 'name')->required(),
-            Forms\Components\Select::make('package_id')->relationship('package', 'name')->required(),
-            Forms\Components\DatePicker::make('booking_date')->required(),
-            Forms\Components\TimePicker::make('start_time')->required(),
-            Forms\Components\TimePicker::make('end_time')->required(),
-            Forms\Components\TextInput::make('total_price')->numeric()->required(),
+            Forms\Components\Select::make('service_id')
+            ->label('Service')
+            ->relationship('service', 'name')
+            ->required()
+            ->reactive(),
+            Forms\Components\Select::make('package_id')
+            ->label('Package')
+            ->options(function (callable $get) {
+                $serviceId = $get('service_id');
+                if (!$serviceId) return [];
+        
+                // Ambil package dari pivot table
+                return \DB::table('service_packages')
+                    ->join('packages', 'packages.id', '=', 'service_packages.package_id')
+                    ->where('service_packages.service_id', $serviceId)
+                    ->where('service_packages.is_active', true)
+                    ->pluck('packages.name', 'packages.id');
+            })
+            ->required()
+            ->reactive()
+            ->afterStateUpdated(fn (callable $get, callable $set) => $set('total_price', self::getPrice($get('service_id'), $get('package_id')))),
+            Forms\Components\DatePicker::make('booking_date')
+            ->label('Tanggal Booking')
+            ->required()
+            ->reactive()
+            ->minDate(now()) // hari ini
+            ->maxDate(now()->addDays(30)) // max 30 hari ke depan
+            ->native(false),
+            Forms\Components\Select::make('time_slot')
+    ->label('Jam Booking')
+    ->options(function (callable $get) {
+        $serviceId = $get('service_id');
+        $packageId = $get('package_id');
+        $date = $get('booking_date');
+
+        if (!$serviceId || !$packageId || !$date) {
+            return [];
+        }
+
+        $dateOnly = Carbon::parse($date)->format('Y-m-d'); // 💉 fix
+
+        $package = \App\Models\Package::find($packageId);
+        $duration = $package?->duration ?? 30;
+
+        $dayOfWeek = Carbon::parse($date)->dayOfWeek;
+
+        $schedule = \App\Models\WeeklySchedule::where('day_of_week', $dayOfWeek)->first();
+        if (!$schedule) return [];
+
+        $start = Carbon::parse("$dateOnly {$schedule->start_time}");
+        $end = Carbon::parse("$dateOnly {$schedule->end_time}");
+
+        $existingBookings = Booking::where('booking_date', $dateOnly)
+            ->where('service_id', $serviceId)
+            ->get();
+
+        $slots = [];
+        while ($start->lt($end)) {
+            $slotEnd = (clone $start)->addMinutes($duration);
+
+            $isBooked = $existingBookings->first(function ($b) use ($start, $slotEnd) {
+                return Carbon::parse($b->start_time)->lt($slotEnd)
+                    && Carbon::parse($b->end_time)->gt($start);
+            });
+
+            if (!$isBooked) {
+                $label = $start->format('H:i') . ' - ' . $slotEnd->format('H:i');
+                $slots[$start->format('H:i:s')] = $label;
+            }
+
+            $start->addMinutes($duration);
+        }
+
+        return $slots;
+    })
+    ->required()
+    ->disabled(fn (callable $get) => !$get('service_id') || !$get('package_id') || !$get('booking_date'))
+    ->hint('Slot otomatis tergenerate dari jadwal dan booking yang ada')
+    ->hidden(fn (callable $get) => !$get('booking_date')),
+
+            Forms\Components\TextInput::make('total_price')
+            ->label('Total Price (IDR)')
+            ->numeric()
+            ->disabled()
+            ->required(),
             Forms\Components\Textarea::make('notes'),
             Forms\Components\Select::make('booking_status_id')
                 ->relationship('bookingStatus', 'name')->required(),
@@ -80,5 +162,45 @@ class BookingResource extends Resource
             'index' => Pages\ListBookings::route('/'),
             'edit' => Pages\EditBooking::route('/{record}/edit'),
         ];
+    }
+    
+    protected static function getPrice($serviceId, $packageId)
+    {
+        if (!$serviceId || !$packageId) return null;
+
+        $price = DB::table('service_packages')
+            ->where('service_id', $serviceId)
+            ->where('package_id', $packageId)
+            ->value('price');  // asumsikan ada kolom 'price' di service_packages
+
+        return $price ?? null;
+    }
+    
+    public static function mutateFormDataBeforeCreate(array $data): array
+    {
+        if (empty($data['booking_code'])) {
+            $data['booking_code'] = 'BOOK-' . strtoupper(Str::random(8));
+        }
+        
+        if (isset($data['booking_date'], $data['time_slot'], $data['package_id'])) {
+            $bookingDate = Carbon::parse($data['booking_date']);
+            $bookingDateOnly = $bookingDate->format('Y-m-d');
+
+            // 🔐 Fix parsing bug
+            $start = Carbon::createFromFormat('Y-m-d H:i:s', $bookingDateOnly . ' ' . $data['time_slot']);
+
+            $duration = \App\Models\Package::find($data['package_id'])?->duration ?? 30;
+            $end = (clone $start)->addMinutes($duration);
+
+            $data['start_time'] = $start->format('H:i:s');
+            $data['end_time'] = $end->format('H:i:s');
+        }
+
+        return $data;
+    }
+
+    public static function mutateFormDataBeforeSave(array $data): array
+    {
+        return static::mutateFormDataBeforeCreate($data);
     }
 }
