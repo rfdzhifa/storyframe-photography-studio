@@ -14,9 +14,12 @@ class ServiceSeeder extends Seeder
     public function run()
     {
         Service::insert([
-            ['name' => 'Photography', 'description' => 'Professional photo shoot', 'is_active' => true],
-            ['name' => 'Videography', 'description' => 'Video recording service', 'is_active' => true],
-            ['name' => 'Editing', 'description' => 'Photo and video editing', 'is_active' => true],
+            ['name' => 'Graduation', 'description' => 'Professional Graduation Photo', 'is_active' => true],
+            ['name' => 'Wedding Photo', 'description' => 'Wedding photo documentation', 'is_active' => true],
+            ['name' => 'Personal Branding', 'description' => 'Professional Profile Photo', 'is_active' => true],
+            ['name' => 'Event Coverage', 'description' => 'Coverage of special & formal events', 'is_active' => true],
+            ['name' => 'Family Portraits', 'description' => 'Studio quality family photos', 'is_active' => true],
+
         ]);
     }
 }
