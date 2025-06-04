@@ -13,6 +13,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\BookingSuccessMail;
 
 class BookingController extends Controller
 {
@@ -85,17 +87,23 @@ class BookingController extends Controller
      
          // Filter slot yang bentrok
          $availableSlots = collect($allSlots)->filter(function ($slot) use ($bookedTimes) {
-             foreach ($bookedTimes as $booked) {
-                 if (
-                     ($slot['start'] >= $booked['start'] && $slot['start'] < $booked['end']) ||
-                     ($slot['end'] > $booked['start'] && $slot['end'] <= $booked['end']) ||
-                     ($slot['start'] <= $booked['start'] && $slot['end'] >= $booked['end']) // full overlap
-                 ) {
-                     return false;
-                 }
-             }
-             return true;
-         })->values();
+            $slotStart = Carbon::createFromFormat('H:i', $slot['start']);
+            $slotEnd = Carbon::createFromFormat('H:i', $slot['end']);
+        
+            foreach ($bookedTimes as $booked) {
+                $bookedStart = Carbon::createFromFormat('H:i', $booked['start']);
+                $bookedEnd = Carbon::createFromFormat('H:i', $booked['end']);
+        
+                if (
+                    ($slotStart >= $bookedStart && $slotStart < $bookedEnd) ||
+                    ($slotEnd > $bookedStart && $slotEnd <= $bookedEnd) ||
+                    ($slotStart <= $bookedStart && $slotEnd >= $bookedEnd)
+                ) {
+                    return false;
+                }
+            }
+            return true;
+        })->values();        
      
          return response()->json($availableSlots);
      }
@@ -108,8 +116,8 @@ class BookingController extends Controller
 {
     $request->validate([
         'full_name' => 'required|string|max:100',
-        'email' => 'required|email|max:100',
-        'phone_number' => 'required|string|max:20',
+        'email' => 'required|email:rfc,dns|max:100',
+        'phone_number' => 'required|string|max:15',
         'service' => 'required|exists:services,id',
         'package' => 'required|exists:packages,id',
         'payment' => 'required|in:dp,full',
@@ -117,6 +125,7 @@ class BookingController extends Controller
         'preferred_time' => 'required|date_format:H:i',
         'notes' => 'nullable|string|max:500',
     ]);
+    
 
     DB::beginTransaction();
 
@@ -175,7 +184,7 @@ class BookingController extends Controller
         $dpAmount = $paymentOption === 'dp' ? $totalPrice * 0.5 : null;
 
         $booking = Booking::create([
-            'booking_code' => 'BOOK-' . strtoupper(Str::random(8)),
+            // 'booking_code' => 'BOOK-' . strtoupper(Str::random(8)),
             'customer_name' => $request->full_name,
             'customer_email' => $request->email,
             'customer_phone' => $request->phone_number,
@@ -194,7 +203,9 @@ class BookingController extends Controller
 
         DB::commit();
 
-        $redirectUrl = route('booking.success', ['booking' => $booking->id]);
+        Mail::to($booking->customer_email)->send(new BookingSuccessMail($booking));
+        
+        $redirectUrl = route('booking.success', ['booking' => $booking]);
 
 
         if ($request->ajax() || $request->wantsJson()) {
@@ -208,10 +219,6 @@ class BookingController extends Controller
                 ]
             ], 200);
         }
-
-        return redirect()->route('booking.success', ['booking' => $booking->id])
-    ->with('success', 'Booking sukses! ID kamu: ' . $booking->booking_code);
-
 
     } catch (\Exception $e) {
 
