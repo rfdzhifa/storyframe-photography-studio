@@ -3,6 +3,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Str;
 
 class Booking extends Model
 {
@@ -61,5 +62,14 @@ class Booking extends Model
     {
         return 'booking_code';
     }
+    
+    protected static function booted()
+{
+    static::creating(function ($booking) {
+        if (empty($booking->booking_code)) {
+            $booking->booking_code = 'BOOK-' . strtoupper(Str::random(8));
+        }
+    });
+}
 
 }

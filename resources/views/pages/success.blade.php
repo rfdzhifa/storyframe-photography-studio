@@ -50,8 +50,8 @@
             <!-- Success Header -->
             <div class="text-center mb-8">
                 <div
-                    class="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4 animate-pulse-slow">
-                    <i class="fas fa-check text-3xl text-green-500">🎉</i>
+                    class="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-4 animate-pulse-slow">
+                    <i class="fas fa-check text-3xl text-blue-500">🎉</i>
                 </div>
                 <h1 class="text-3xl font-bold text-gray-800 mb-2">Booking Berhasil!</h1>
                 <p class="text-gray-600">Terima kasih telah mempercayai layanan kami</p>
@@ -60,7 +60,7 @@
             <!-- Main Booking Card -->
             <div class="bg-white rounded-2xl card-shadow overflow-hidden mb-6">
                 <!-- Header -->
-                <div class="bg-gradient-to-r from-green-500 to-green-600 px-6 py-4">
+                <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
                     <div class="flex items-center justify-between flex-wrap gap-2">
                         <h2 class="text-xl font-bold text-white">Detail Booking</h2>
                         <span class="bg-white/20 px-3 py-1 rounded-full text-sm text-white font-medium">

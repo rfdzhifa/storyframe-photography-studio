@@ -87,17 +87,23 @@ class BookingController extends Controller
      
          // Filter slot yang bentrok
          $availableSlots = collect($allSlots)->filter(function ($slot) use ($bookedTimes) {
-             foreach ($bookedTimes as $booked) {
-                 if (
-                     ($slot['start'] >= $booked['start'] && $slot['start'] < $booked['end']) ||
-                     ($slot['end'] > $booked['start'] && $slot['end'] <= $booked['end']) ||
-                     ($slot['start'] <= $booked['start'] && $slot['end'] >= $booked['end']) // full overlap
-                 ) {
-                     return false;
-                 }
-             }
-             return true;
-         })->values();
+            $slotStart = Carbon::createFromFormat('H:i', $slot['start']);
+            $slotEnd = Carbon::createFromFormat('H:i', $slot['end']);
+        
+            foreach ($bookedTimes as $booked) {
+                $bookedStart = Carbon::createFromFormat('H:i', $booked['start']);
+                $bookedEnd = Carbon::createFromFormat('H:i', $booked['end']);
+        
+                if (
+                    ($slotStart >= $bookedStart && $slotStart < $bookedEnd) ||
+                    ($slotEnd > $bookedStart && $slotEnd <= $bookedEnd) ||
+                    ($slotStart <= $bookedStart && $slotEnd >= $bookedEnd)
+                ) {
+                    return false;
+                }
+            }
+            return true;
+        })->values();        
      
          return response()->json($availableSlots);
      }
@@ -178,7 +184,7 @@ class BookingController extends Controller
         $dpAmount = $paymentOption === 'dp' ? $totalPrice * 0.5 : null;
 
         $booking = Booking::create([
-            'booking_code' => 'BOOK-' . strtoupper(Str::random(8)),
+            // 'booking_code' => 'BOOK-' . strtoupper(Str::random(8)),
             'customer_name' => $request->full_name,
             'customer_email' => $request->email,
             'customer_phone' => $request->phone_number,

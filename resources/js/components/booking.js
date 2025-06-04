@@ -27,6 +27,48 @@ export function initBookingSlide() {
     let isFetchingSlots = false;
     let fetchSlotsTimeout = null;
 
+    function showToast(message, duration = 3000) {
+        let container = document.getElementById('toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toast-container';
+            container.style.position = 'fixed';
+            container.style.top = '20px';
+            container.style.left = '50%';
+            container.style.transform = 'translateX(-50%)';
+            container.style.zIndex = '9999';
+            container.style.display = 'flex';
+            container.style.flexDirection = 'column';
+            container.style.gap = '8px';
+            document.body.appendChild(container);
+        }
+
+        const toast = document.createElement('div');
+        toast.textContent = message;
+        toast.style.background = '#dbeafe';  // blue-100
+        toast.style.color = '#2563eb';       // blue-600
+        toast.style.padding = '10px 15px';
+        toast.style.borderRadius = '8px';
+        toast.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+        toast.style.fontSize = '14px';
+        toast.style.minWidth = '200px';
+        toast.style.opacity = '1';
+        toast.style.transition = 'opacity 0.5s ease';
+
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => {
+                toast.remove();
+                if (!container.hasChildNodes()) {
+                    container.remove();
+                }
+            }, 500);
+        }, duration);
+    }
+
+
     function validateStep(currentStep) {
         const fields = [];
         let isValid = true;
@@ -50,7 +92,7 @@ export function initBookingSlide() {
             if (emailField.value.trim() && !isValidEmail(emailField.value)) {
                 emailField.classList.remove('border-gray-300');
                 emailField.classList.add('border-red-500');
-                alert('Masukkan alamat email yang valid.');
+                showToast('Masukkan alamat email yang valid.');
                 isValid = false;
             }
 
@@ -58,7 +100,7 @@ export function initBookingSlide() {
             if (phoneField.value.trim() && !isValidPhone(phoneField.value.trim())) {
                 phoneField.classList.remove('border-gray-300');
                 phoneField.classList.add('border-red-500');
-                alert('Masukkan nomor telepon valid dengan kode negara, panjang 10–15 digit.');
+                showToast('Masukkan nomor telepon valid dengan kode negara, panjang 10–15 digit.');
                 isValid = false;
             }
 
@@ -71,7 +113,7 @@ export function initBookingSlide() {
             // Check radio buttons for payment
             const paymentSelected = document.querySelector('input[name="payment"]:checked');
             if (!paymentSelected) {
-                alert('Mohon pilih opsi pembayaran.');
+                showToast('Mohon pilih opsi pembayaran.');
                 isValid = false;
             }
         } else if (currentStep === 3) {
@@ -97,7 +139,7 @@ export function initBookingSlide() {
 
         // Show alert if there are empty fields
         if (emptyFields.length > 0) {
-            alert(`Harap lengkapi kolom berikut:\n- ${emptyFields.join('\n- ')}`);
+            showToast(`Harap lengkapi kolom berikut:\n- ${emptyFields.join('\n- ')}`);
         }
 
         return isValid;
@@ -271,13 +313,13 @@ export function initBookingSlide() {
         maxDate.setDate(today.getDate() + 30);
 
         if (selectedDate < today) {
-            alert('Ga bisa pilih tanggal yang udah lewat.');
+            showToast('Ga bisa pilih tanggal yang udah lewat.');
             bookingDateInput.value = '';
             return;
         }
 
         if (selectedDate > maxDate) {
-            alert('Hanya bisa booking maksimal 30 hari ke depan.');
+            showToast('Hanya bisa booking maksimal 30 hari ke depan.');
             bookingDateInput.value = '';
             return;
         }
@@ -481,12 +523,12 @@ export function initBookingSlide() {
                             console.error("Error Response:", data);
 
                             if (data.message) {
-                                alert(data.message);
+                                showToast(data.message);
                             } else if (data.errors) {
                                 const firstError = Object.values(data.errors)[0];
-                                alert(Array.isArray(firstError) ? firstError[0] : firstError);
+                                showToast(Array.isArray(firstError) ? firstError[0] : firstError);
                             } else {
-                                alert("Gagal booking. Cek inputmu!");
+                                showToast("Gagal booking. Cek inputmu!");
                             }
 
                             if (data.errors) {
@@ -502,9 +544,9 @@ export function initBookingSlide() {
                         console.log("Booking sukses:", data);
 
                         if (data.message) {
-                            alert(data.message);
+                            showToast(data.message);
                         } else {
-                            alert('Booking sukses!');
+                            showToast('Booking sukses!');
                         }
 
                         if (data.data && data.data.redirect_url) {
@@ -517,7 +559,7 @@ export function initBookingSlide() {
                         console.error("Booking gagal:", err);
 
                         if (!err.message.includes('HTTP')) {
-                            alert("Terjadi error saat booking. Silakan coba lagi.");
+                            showToast("Terjadi error saat booking. Silakan coba lagi.");
                         }
                     })
                     .finally(() => {

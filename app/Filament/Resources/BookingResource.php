@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class BookingResource extends Resource
 {
@@ -26,7 +27,10 @@ class BookingResource extends Resource
     public static function form(Forms\Form $form): Forms\Form
     {
         return $form->schema([
-            Forms\Components\TextInput::make('booking_code')->disabled(),
+            Forms\Components\TextInput::make('booking_code')
+            ->label('Booking Code')
+            ->disabled()
+            ->dehydrated(false),
             Forms\Components\TextInput::make('customer_name')->required(),
             Forms\Components\TextInput::make('customer_email')->email()->required(),
             Forms\Components\TextInput::make('customer_phone')->required(),
@@ -55,15 +59,15 @@ class BookingResource extends Resource
             ->label('Tanggal Booking')
             ->required()
             ->reactive()
-            ->minDate(now()) // hari ini
+            ->minDate(now()->startOfDay())
             ->maxDate(now()->addDays(30)) // max 30 hari ke depan
             ->native(false),
             Forms\Components\Select::make('time_slot')
-    ->label('Jam Booking')
-    ->options(function (callable $get) {
-        $serviceId = $get('service_id');
-        $packageId = $get('package_id');
-        $date = $get('booking_date');
+            ->label('Jam Booking')
+            ->options(function (callable $get) {
+                $serviceId = $get('service_id');
+                $packageId = $get('package_id');
+                $date = $get('booking_date');
 
         if (!$serviceId || !$packageId || !$date) {
             return [];
@@ -106,6 +110,7 @@ class BookingResource extends Resource
         return $slots;
     })
     ->required()
+    ->dehydrated(fn () => true)
     ->disabled(fn (callable $get) => !$get('service_id') || !$get('package_id') || !$get('booking_date'))
     ->hint('Slot otomatis tergenerate dari jadwal dan booking yang ada')
     ->hidden(fn (callable $get) => !$get('booking_date')),
@@ -118,12 +123,29 @@ class BookingResource extends Resource
             Forms\Components\Textarea::make('notes'),
             Forms\Components\Select::make('booking_status_id')
                 ->relationship('bookingStatus', 'name')->required(),
-            Forms\Components\Select::make('payment_option')
+                Forms\Components\Select::make('payment_option')
                 ->options([
                     'dp' => 'DP',
                     'full' => 'Full Payment',
-                ])->required(),
-            Forms\Components\TextInput::make('down_payment_amount')->numeric()->nullable(),
+                ])
+                ->required()
+                ->reactive()
+                ->afterStateUpdated(function (callable $get, callable $set, $state) {
+                    $total = $get('total_price');
+        
+                    if ($state === 'dp' && is_numeric($total)) {
+                        $set('down_payment_amount', $total * 0.5);
+                    } elseif ($state === 'full') {
+                        $set('down_payment_amount', $total);
+                    }
+                }),
+                Forms\Components\TextInput::make('down_payment_amount')
+                ->numeric()
+                ->label('Down Payment (IDR)')
+                ->nullable()
+                ->disabled(fn (callable $get) => $get('payment_option') === 'dp') // Optional: biar user gak bisa edit manual
+                ->dehydrated()
+                ->reactive(),
             Forms\Components\Select::make('payment_status')
                 ->options([
                     'pending' => 'Pending',
@@ -141,8 +163,12 @@ class BookingResource extends Resource
                 Tables\Columns\TextColumn::make('bookingStatus.name')->label('Status'),
                 Tables\Columns\TextColumn::make('service.name')->label('Service'),
                 Tables\Columns\TextColumn::make('package.name')->label('Package'),
-                Tables\Columns\TextColumn::make('booking_date'),
-                Tables\Columns\TextColumn::make('start_time'),
+                Tables\Columns\TextColumn::make('booking_date')
+                ->label('Tanggal Booking')
+                ->date('d M Y'),
+                Tables\Columns\TextColumn::make('start_time')
+                    ->label('Jam Booking')
+                    ->time('H:i'),
                 Tables\Columns\TextColumn::make('total_price')->money('IDR'),
                 Tables\Columns\TextColumn::make('payment_option')->label('Payment Options'),
                 Tables\Columns\TextColumn::make('payment_status')->label('Payment Status'),
@@ -160,6 +186,7 @@ class BookingResource extends Resource
     {
         return [
             'index' => Pages\ListBookings::route('/'),
+            'create' => Pages\CreateBooking::route('/create'),
             'edit' => Pages\EditBooking::route('/{record}/edit'),
         ];
     }
@@ -171,29 +198,27 @@ class BookingResource extends Resource
         $price = DB::table('service_packages')
             ->where('service_id', $serviceId)
             ->where('package_id', $packageId)
-            ->value('price');  // asumsikan ada kolom 'price' di service_packages
+            ->value('price');
 
         return $price ?? null;
     }
     
     public static function mutateFormDataBeforeCreate(array $data): array
     {
-        if (empty($data['booking_code'])) {
-            $data['booking_code'] = 'BOOK-' . strtoupper(Str::random(8));
-        }
         
         if (isset($data['booking_date'], $data['time_slot'], $data['package_id'])) {
             $bookingDate = Carbon::parse($data['booking_date']);
             $bookingDateOnly = $bookingDate->format('Y-m-d');
 
-            // 🔐 Fix parsing bug
-            $start = Carbon::createFromFormat('Y-m-d H:i:s', $bookingDateOnly . ' ' . $data['time_slot']);
+            $start = Carbon::parse($bookingDateOnly . ' ' . $data['time_slot']);
 
             $duration = \App\Models\Package::find($data['package_id'])?->duration ?? 30;
             $end = (clone $start)->addMinutes($duration);
 
             $data['start_time'] = $start->format('H:i:s');
             $data['end_time'] = $end->format('H:i:s');
+            
+            Log::info('Form data:', $data);
         }
 
         return $data;
@@ -201,6 +226,13 @@ class BookingResource extends Resource
 
     public static function mutateFormDataBeforeSave(array $data): array
     {
+        Log::info('mutateFormDataBeforeSave dipanggil', $data);
+
         return static::mutateFormDataBeforeCreate($data);
+    }
+    
+    public static function canCreate(): bool
+    {
+        return false;
     }
 }
