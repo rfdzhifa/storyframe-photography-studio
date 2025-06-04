@@ -15,12 +15,11 @@
       <a href="#home" class="text-gray-500 text-sm hover:text-blue-600 transition">HOME</a>
       <a href="#about" class="text-gray-500 text-sm hover:text-blue-600 transition">ABOUT</a>
       <a href="#gallery" class="text-gray-500 text-sm hover:text-blue-600 transition">GALLERY</a>
-      <a href="#services" class="text-gray-500 text-sm hover:text-blue-600 transition">SERVICES</a>
     </div>
 
     {{-- Desktop Booking Button --}}
     <a href="{{ route('booking.index') }}"
-      class="hidden md:flex h-10 md:h-12 px-4 md:px-8 bg-blue-600 text-white text-xs md:text-sm font-medium rounded-full hover:bg-blue-700 transition justify-center items-center">
+      class="hidden lg:flex h-10 lg:h-12 px-4 lg:px-8 bg-blue-600 text-white text-xs lg:text-sm font-medium rounded-full hover:bg-blue-700 transition justify-center items-center">
       BOOKING
     </a>
 
@@ -40,10 +39,8 @@
       <a href="#home" class="block text-gray-600 text-sm hover:text-blue-600 transition py-2">HOME</a>
       <a href="#about" class="block text-gray-600 text-sm hover:text-blue-600 transition py-2">ABOUT</a>
       <a href="#gallery" class="block text-gray-600 text-sm hover:text-blue-600 transition py-2">GALLERY</a>
-      <a href="#services" class="block text-gray-600 text-sm hover:text-blue-600 transition py-2">SERVICES</a>
       <a href="#contact" class="block text-gray-600 text-sm hover:text-blue-600 transition py-2">CONTACT</a>
 
-      {{-- Mobile Booking Button --}}
       <div class="pt-3 border-t border-gray-100">
         <a href="{{ route('booking.index') }}"
           class="block w-full h-12 px-6 bg-blue-600 text-white text-sm font-medium rounded-full hover:bg-blue-700 transition flex justify-center items-center">

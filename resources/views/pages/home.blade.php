@@ -169,9 +169,6 @@
         </div>
     </section>
 
-    <!-- Services Section -->
-    <x-ourServices />
-
     <!-- Location Section -->
     <section id="location"
         class="full-page-section w-full min-h-screen bg-zinc-100 px-4 md:px-8 lg:px-40 py-16 md:py-24 lg:py-36 flex flex-col justify-center items-center gap-8">

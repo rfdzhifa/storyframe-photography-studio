@@ -205,7 +205,7 @@ class BookingController extends Controller
 
         Mail::to($booking->customer_email)->send(new BookingSuccessMail($booking));
         
-        $redirectUrl = route('booking.success', ['booking' => $booking]);
+        $redirectUrl = route('booking.success', parameters: ['booking' => $booking]);
 
 
         if ($request->ajax() || $request->wantsJson()) {

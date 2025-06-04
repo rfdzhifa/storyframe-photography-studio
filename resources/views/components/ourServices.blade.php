@@ -73,7 +73,13 @@
 
             {{-- EVENT --}}
             <div class="rounded-2xl overflow-hidden min-w-[300px]" data-category="event-coverage">
-                <img src="{{ asset('assets/images/event1.jpg') }}" alt="Event" class="w-full h-72 object-cover">
+                <img src="{{ asset('assets/images/event1.jpg') }}" alt="Event 1" class="w-full h-72 object-cover">
+            </div>
+            <div class="rounded-2xl overflow-hidden min-w-[300px]" data-category="event-coverage">
+                <img src="{{ asset('assets/images/event2.jpg') }}" alt="Event 2" class="w-full h-72 object-cover">
+            </div>
+            <div class="rounded-2xl overflow-hidden min-w-[300px]" data-category="event-coverage">
+                <img src="{{ asset('assets/images/event3.jpg') }}" alt="Event 3" class="w-full h-72 object-cover">
             </div>
 
             {{-- FAMILY --}}
