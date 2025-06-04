@@ -270,7 +270,7 @@
       </div>
       <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
       <button id="confirmYes" type="button"
-        class="inline-flex w-full justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 sm:ml-3 sm:w-auto">Ya,
+        class="inline-flex w-full justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 sm:ml-3 sm:w-auto">Ya,
         lanjut</button>
       <button id="confirmNo" type="button"
         class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 sm:mt-0 sm:w-auto">Batal</button>
