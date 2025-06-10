@@ -15,7 +15,7 @@ use App\Http\Controllers\BookingController; // Pastikan ini di-import
 */
 
 Route::get('/', function () {
-    return view('pages.home'); // Asumsi ada halaman home
+    return view('pages.home');
 })->name('home');
 
 // Booking Routes
@@ -34,10 +34,4 @@ Route::prefix('booking')->name('booking.')->group(function () {
     
     // Booking success page
     Route::get('/success/{booking}', [BookingController::class, 'success'])->name('success');
-    
-    // Show booking details
-    Route::get('/show/{id}', [BookingController::class, 'show'])->name('show');
-    
-    // Cancel booking
-    Route::patch('/cancel/{booking}', [BookingController::class, 'cancel'])->name('cancel');
 });
