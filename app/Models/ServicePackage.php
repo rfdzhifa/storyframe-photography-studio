@@ -2,14 +2,17 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
 class ServicePackage extends Pivot
 {
+    use HasFactory;
     /**
      * @var bool
      */
+    
     public $incrementing = true;
 
     /**
@@ -54,5 +57,10 @@ class ServicePackage extends Pivot
     public function package(): BelongsTo
     {
         return $this->belongsTo(Package::class);
+    }
+
+    protected static function newFactory()
+    {
+        return \Database\Factories\ServicePackageFactory::new();
     }
 }
