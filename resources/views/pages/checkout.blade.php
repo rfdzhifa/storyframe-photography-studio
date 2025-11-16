@@ -75,7 +75,7 @@
           </div>
 
           {{-- Payment Options --}}
-          <div class="w-full space-y-2">
+          <div id="payment-wrapper" class="w-full space-y-2">
             <span class="block text-sm font-medium text-gray-700">
               Payment Options <span class="text-red-500">*</span>
             </span>
@@ -387,7 +387,129 @@
       notesInput.addEventListener('input', syncNotes);
     }
 
+    // ================================
+    //  FORM SUBMIT + MODAL + VALIDASI
+    // ================================
+    const form = document.getElementById('booking-form');
+    const modal = document.getElementById('confirmModal');
+    const confirmYesBtn = document.getElementById('confirmYes');
+    const confirmNoBtn = document.getElementById('confirmNo');
 
+    function openModal() {
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      document.body.classList.add('overflow-hidden');
+    }
+
+    function closeModal() {
+      if (!modal) return;
+      modal.classList.add('hidden');
+      document.body.classList.remove('overflow-hidden');
+    }
+
+    // Hapus error-error front-end sebelumnya
+    function clearClientErrors() {
+      document.querySelectorAll('.client-error').forEach(el => el.remove());
+    }
+
+    // Tampilkan error di bawah input text
+    function showFieldError(inputEl, message) {
+      if (!inputEl) return;
+      const wrapper = inputEl.closest('.w-full') || inputEl.parentElement;
+      if (!wrapper) return;
+
+      let errorEl = wrapper.querySelector('.client-error');
+      if (!errorEl) {
+        errorEl = document.createElement('p');
+        errorEl.className = 'client-error text-sm text-red-500 mt-1';
+        wrapper.appendChild(errorEl);
+      }
+      errorEl.textContent = message;
+    }
+
+    // Error khusus payment (radio)
+    function showPaymentError(message) {
+      const paymentWrapper = document.getElementById('payment-wrapper');
+      if (!paymentWrapper) return;
+
+      let errorEl = paymentWrapper.querySelector('.client-error');
+      if (!errorEl) {
+        errorEl = document.createElement('p');
+        errorEl.className = 'client-error text-sm text-red-500 mt-1';
+        paymentWrapper.appendChild(errorEl);
+      }
+      errorEl.textContent = message;
+    }
+
+    // Validasi front-end
+    function validateForm() {
+      clearClientErrors();
+      let valid = true;
+
+      const fullName = document.getElementById('full_name');
+      const email = document.getElementById('email');
+      const phone = document.getElementById('phone_number');
+
+      if (!fullName || !email || !phone) return false;
+
+      if (!fullName.value.trim()) {
+        showFieldError(fullName, 'Full name wajib diisi.');
+        valid = false;
+      }
+
+      if (!email.value.trim()) {
+        showFieldError(email, 'Email wajib diisi.');
+        valid = false;
+      }
+
+      if (!phone.value.trim()) {
+        showFieldError(phone, 'Phone Number wajib diisi.');
+        valid = false;
+      }
+
+      let paymentSelected = false;
+      paymentRadios.forEach(r => {
+        if (r.checked) paymentSelected = true;
+      });
+      if (!paymentSelected) {
+        showPaymentError('Pilih salah satu opsi pembayaran.');
+        valid = false;
+      }
+
+      return valid;
+    }
+
+    // Intercept submit form → validasi → kalau lolos, baru buka modal
+    if (form) {
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        if (!validateForm()) {
+          const firstError = document.querySelector('.client-error');
+          if (firstError) {
+            firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          return;
+        }
+
+        openModal();
+      });
+    }
+
+    // Tombol "Ya, lanjut" → tutup modal + submit beneran (tanpa intercept)
+    if (confirmYesBtn && form) {
+      confirmYesBtn.addEventListener('click', function () {
+        closeModal();
+        form.submit(); // bypass event submit JS, langsung ke server
+      });
+    }
+
+    // Tombol "Batal" → cuma tutup modal
+    if (confirmNoBtn) {
+      confirmNoBtn.addEventListener('click', function () {
+        closeModal();
+      });
+    }
   });
 </script>
 
