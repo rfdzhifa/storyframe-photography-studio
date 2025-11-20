@@ -25,8 +25,9 @@ class Booking extends Model
         'payment_option',
         'down_payment_amount',
         'payment_status',
+        'paid_at'
     ];
-    
+
 
     protected $casts = [
         'booking_date' => 'date',
@@ -34,6 +35,7 @@ class Booking extends Model
         'end_time' => 'datetime:H:i:s',
         'down_payment_amount' => 'float',
         'total_price' => 'float',
+        'paid_at' => 'datetime',
     ];
 
 

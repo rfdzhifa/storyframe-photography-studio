@@ -264,7 +264,16 @@ export function initBookingSlide() {
     }
 
     function toggleDpInfo() {
+        // Cek element dp-info
+        const dpInfoDiv = document.getElementById('dp-info');
+
+        if (!dpInfoDiv) {
+            console.warn('[Booking] Element #dp-info tidak ditemukan di DOM');
+            return;
+        }
+
         const dpSelected = document.querySelector('input[name="payment"][value="dp"]:checked');
+
         if (dpSelected) {
             dpInfoDiv.classList.remove('hidden');
         } else {
@@ -591,10 +600,10 @@ export function initBookingSlide() {
     }
 
     // Handle old payment selection
-    const selectedPayment = document.querySelector('input[name="payment"]:checked');
-    if (selectedPayment) {
-        toggleDpInfo();
-    }
+    // const selectedPayment = document.querySelector('input[name="payment"]:checked');
+    // if (selectedPayment) {
+    //     toggleDpInfo();
+    // }
 
     // Expose functions to global scope for HTML onclick handlers
     window.nextStep = nextStep;
