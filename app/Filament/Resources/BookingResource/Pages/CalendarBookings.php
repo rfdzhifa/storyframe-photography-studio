@@ -49,6 +49,8 @@ class CalendarBookings extends Page
                         'booking_date'   => Carbon::parse($booking->booking_date)->format('d M Y'),
                         'start_time'     => Carbon::parse($booking->start_time)->format('H:i'),
                         'end_time'       => Carbon::parse($booking->end_time)->format('H:i'),
+
+                        'edit_url'       => BookingResource::getUrl('edit', ['record' => $booking]),
                     ],
                 ];
             })
@@ -59,16 +61,14 @@ class CalendarBookings extends Page
     protected function getHeaderActions(): array
     {
         return [
-            // balik ke tabel
-            Actions\Action::make('board')
-                ->label('Board')
-                ->icon('heroicon-o-view-columns')
+            Actions\Action::make('list')
+                ->label('List View')
+                ->icon('heroicon-o-list-bullet')
                 ->url(fn () => BookingResource::getUrl('index'))
                 ->button(),
 
-            // halaman sekarang = calendar
             Actions\Action::make('calendar')
-                ->label('Calendar')
+                ->label('Calendar View')
                 ->icon('heroicon-o-calendar')
                 ->color('primary')
                 ->disabled(),
