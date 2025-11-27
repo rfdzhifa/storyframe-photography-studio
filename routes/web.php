@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\BookingController; // Pastikan ini di-import
+use App\Http\Controllers\BookingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -28,7 +28,7 @@ Route::prefix('booking')->name('booking.')->group(function () {
     Route::get('/detail/{service}', [BookingController::class, 'detail'])->name('detail');
 
     // Store new booking
-    Route::post('/store', [BookingController::class, 'store'])->name('store');
+    Route::post('/store', action: [BookingController::class, 'store'])->name('store');
 
     // Get available time slots
     Route::post('/slots', [BookingController::class, 'getAvailableSlots'])->name('slots');

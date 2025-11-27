@@ -111,135 +111,6 @@ class BookingController extends Controller
          return response()->json($availableSlots);
      }
 
-    /**
-     * Menyimpan data booking baru.
-     */
-//     public function store(Request $request)
-// {
-//     $request->validate([
-//         'full_name' => 'required|string|max:100',
-//         'email' => 'required|email:rfc,dns|max:100',
-//         'phone_number' => 'required|string|max:15',
-//         'service' => 'required|exists:services,id',
-//         'package' => 'required|exists:packages,id',
-//         'payment' => 'required|in:dp,full',
-//         'booking_date' => 'required|date_format:Y-m-d|after_or_equal:today|before_or_equal:' . Carbon::today()->addDays(30)->toDateString(),
-//         'preferred_time' => 'required|date_format:H:i',
-//         'notes' => 'nullable|string|max:500',
-//     ]);
-
-
-//     DB::beginTransaction();
-
-//     try {
-//         $service = Service::findOrFail($request->service);
-//         $package = Package::findOrFail($request->package);
-//         $duration = (int) $package->duration_minutes;
-
-//         $bookingDate = Carbon::parse($request->booking_date);
-//         $startTime = Carbon::createFromFormat('Y-m-d H:i', $request->booking_date . ' ' . $request->preferred_time);
-//         $endTime = $startTime->copy()->addMinutes($duration);
-
-//         // Check booking collision
-//         $slotTaken = Booking::where('service_id', $service->id)
-//             ->where('booking_date', $bookingDate->toDateString())
-//             ->where(function ($query) use ($startTime, $endTime) {
-//                 $query->where('start_time', '<', $endTime->format('H:i:s'))
-//                       ->where('end_time', '>', $startTime->format('H:i:s'));
-//             })
-//             ->whereHas('bookingStatus', function ($q) {
-//                 $q->whereNotIn('name', ['Cancelled', 'Rejected']);
-//             })
-//             ->exists();
-
-//         if ($slotTaken) {
-//             throw new \Exception('Slot sudah diambil. Silakan pilih waktu lain.');
-//         }
-
-//         $dayOfWeek = $bookingDate->dayOfWeek;
-
-//         $studioSchedule = WeeklySchedule::where('day_of_week', $dayOfWeek)
-//             ->where('is_available', true)
-//             ->first();
-
-//         if (!$studioSchedule) {
-//             throw new \Exception('Studio tutup di hari yang dipilih.');
-//         }
-
-//         $pendingStatus = BookingStatus::where('name', 'Pending')->first();
-//         if (!$pendingStatus) {
-//             throw new \Exception('BookingStatus "Pending" tidak ditemukan!');
-//         }
-
-//         $pivotPrice = DB::table('service_packages')
-//     ->where('service_id', $service->id)
-//     ->where('package_id', $package->id)
-//     ->value('price');
-
-//     if ($pivotPrice === null) {
-//         throw new \Exception('Harga kombinasi service & package tidak ditemukan.');
-//     }
-
-
-//         $totalPrice = (float) $pivotPrice;
-//         $paymentOption = $request->payment;
-//         $dpAmount = $paymentOption === 'dp' ? $totalPrice * 0.5 : null;
-
-//         $booking = Booking::create([
-//             // 'booking_code' => 'BOOK-' . strtoupper(Str::random(8)),
-//             'customer_name' => $request->full_name,
-//             'customer_email' => $request->email,
-//             'customer_phone' => $request->phone_number,
-//             'service_id' => $service->id,
-//             'package_id' => $package->id,
-//             'booking_status_id' => $pendingStatus->id,
-//             'booking_date' => $bookingDate->toDateString(),
-//             'start_time' => $startTime->format('H:i:s'),
-//             'end_time' => $endTime->format('H:i:s'),
-//             'total_price' => $totalPrice,
-//             'notes' => $request->notes,
-//             'payment_option' => $paymentOption,
-//             'down_payment_amount' => $dpAmount,
-//             'payment_status' => 'pending',
-//         ]);
-
-//         DB::commit();
-
-//         Mail::to($booking->customer_email)->send(new BookingSuccessMail($booking));
-
-//         $redirectUrl = route('booking.success', parameters: ['booking' => $booking]);
-
-
-//         if ($request->ajax() || $request->wantsJson()) {
-//             return response()->json([
-//                 'success' => true,
-//                 'message' => 'Booking sukses! ID kamu: ' . $booking->booking_code,
-//                 'data' => [
-//                     'booking_id' => $booking->id,
-//                     'booking_code' => $booking->booking_code,
-//                     'redirect_url' => $redirectUrl
-//                 ]
-//             ], 200);
-//         }
-
-//     } catch (\Exception $e) {
-
-//         // Super verbose logging biar jelas banget errornya apa
-//         Log::error("Booking gagal: " . $e->getMessage());
-//         Log::error($e->getTraceAsString());
-
-//         if ($request->ajax() || $request->wantsJson()) {
-//             return response()->json([
-//                 'success' => false,
-//                 'message' => 'Terjadi error saat booking: ' . $e->getMessage(),
-//                 'errors' => ['error' => $e->getMessage()]
-//             ], 500);
-//         }
-
-//         return back()->withErrors(['error' => 'Terjadi error saat booking: ' . $e->getMessage()])->withInput();
-//     }
-// }
-// halaman form + ringkasan
 public function checkout(Request $request)
 {
     // ambil dari query: ?service= & ?package=
@@ -326,7 +197,6 @@ public function checkout(Request $request)
         }
 
         // 5. CEK STUDIO BUKA/TUTUP BERDASARKAN JADWAL MINGGUAN
-        // pake nama hari biar konsisten sama getAvailableSlots()
         $dayName = $bookingDate->format('l'); // "Monday", "Tuesday", ...
         $studioSchedule = WeeklySchedule::where('day_of_week', $dayName)
             ->where('is_available', true)
@@ -358,8 +228,6 @@ public function checkout(Request $request)
 
         // 8. SIMPAN BOOKING KE DATABASE
         $booking = Booking::create([
-            // kalau booking_code digenerate otomatis di model, bagian ini tidak perlu
-            // 'booking_code' => 'BOOK-' . strtoupper(Str::random(8)),
             'customer_name'       => $validated['full_name'],
             'customer_email'      => $validated['email'],
             'customer_phone'      => $validated['phone_number'],
@@ -376,7 +244,7 @@ public function checkout(Request $request)
             'payment_status'      => 'pending',
         ]);
 
-        // 9. KIRIM EMAIL KONFIRMASI (OPSIONAL, SUDAH ADA DI KODE LAMA)
+        // 9. KIRIM EMAIL KONFIRMASI
         Mail::to($booking->customer_email)->send(new BookingSuccessMail($booking));
 
         DB::commit();
