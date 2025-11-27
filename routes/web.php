@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\BookingController;
+use App\Http\Controllers\PaymentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -41,4 +42,7 @@ Route::prefix('booking')->name('booking.')->group(function () {
 
     // Booking success page
     Route::get('/success/{booking}', [BookingController::class, 'success'])->name('success');
+    
+    Route::post('/payment/create', [PaymentController::class, 'createTransaction'])
+    ->name('payment.create');
 });

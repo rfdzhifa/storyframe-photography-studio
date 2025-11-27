@@ -260,17 +260,17 @@ export function initBookingSlide() {
         priceDisplay.classList.remove('hidden');
 
         // Update DP info visibility based on payment selection
-        toggleDpInfo();
+        // toggleDpInfo();
     }
 
-    function toggleDpInfo() {
-        const dpSelected = document.querySelector('input[name="payment"][value="dp"]:checked');
-        if (dpSelected) {
-            dpInfoDiv.classList.remove('hidden');
-        } else {
-            dpInfoDiv.classList.add('hidden');
-        }
-    }
+    // function toggleDpInfo() {
+    //     const dpSelected = document.querySelector('input[name="payment"][value="dp"]:checked');
+    //     if (dpSelected) {
+    //         dpInfoDiv.classList.remove('hidden');
+    //     } else {
+    //         dpInfoDiv.classList.add('hidden');
+    //     }
+    // }
 
     function hidePrice() {
         priceDisplay.classList.add('hidden');
@@ -445,9 +445,9 @@ export function initBookingSlide() {
     }
 
     // Payment radio buttons
-    document.querySelectorAll('input[name="payment"]').forEach(radio => {
-        radio.addEventListener('change', toggleDpInfo);
-    });
+    // document.querySelectorAll('input[name="payment"]').forEach(radio => {
+    //     radio.addEventListener('change', toggleDpInfo);
+    // });
 
     function showConfirmModal() {
         return new Promise((resolve) => {

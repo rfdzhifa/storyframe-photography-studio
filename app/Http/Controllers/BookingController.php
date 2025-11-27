@@ -207,7 +207,7 @@ public function checkout(Request $request)
         }
 
         // 6. AMBIL STATUS "Pending"
-        $pendingStatus = BookingStatus::where('name', 'Pending')->first();
+        $pendingStatus = BookingStatus::where('name', 'Pending Payment')->first();
         if (!$pendingStatus) {
             throw new \Exception('BookingStatus "Pending" tidak ditemukan!');
         }
