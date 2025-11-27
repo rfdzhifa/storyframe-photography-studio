@@ -44,7 +44,7 @@ class BookingResource extends Resource
             ->options(function (callable $get) {
                 $serviceId = $get('service_id');
                 if (!$serviceId) return [];
-        
+
                 // Ambil package dari pivot table
                 return \DB::table('service_packages')
                     ->join('packages', 'packages.id', '=', 'service_packages.package_id')
@@ -132,7 +132,7 @@ class BookingResource extends Resource
                 ->reactive()
                 ->afterStateUpdated(function (callable $get, callable $set, $state) {
                     $total = $get('total_price');
-        
+
                     if ($state === 'dp' && is_numeric($total)) {
                         $set('down_payment_amount', $total * 0.5);
                     } elseif ($state === 'full') {
@@ -186,11 +186,12 @@ class BookingResource extends Resource
     {
         return [
             'index' => Pages\ListBookings::route('/'),
+            'calendar' => Pages\CalendarBookings::route('/calendar'),
             'create' => Pages\CreateBooking::route('/create'),
             'edit' => Pages\EditBooking::route('/{record}/edit'),
         ];
     }
-    
+
     protected static function getPrice($serviceId, $packageId)
     {
         if (!$serviceId || !$packageId) return null;
@@ -202,10 +203,10 @@ class BookingResource extends Resource
 
         return $price ?? null;
     }
-    
+
     public static function mutateFormDataBeforeCreate(array $data): array
     {
-        
+
         if (isset($data['booking_date'], $data['time_slot'], $data['package_id'])) {
             $bookingDate = Carbon::parse($data['booking_date']);
             $bookingDateOnly = $bookingDate->format('Y-m-d');
@@ -217,7 +218,7 @@ class BookingResource extends Resource
 
             $data['start_time'] = $start->format('H:i:s');
             $data['end_time'] = $end->format('H:i:s');
-            
+
             Log::info('Form data:', $data);
         }
 
@@ -230,7 +231,7 @@ class BookingResource extends Resource
 
         return static::mutateFormDataBeforeCreate($data);
     }
-    
+
     public static function canCreate(): bool
     {
         return false;

@@ -13,7 +13,18 @@ class ListBookings extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            Actions\Action::make('list')
+                ->label('List View')
+                ->icon('heroicon-o-list-bullet')
+                ->color('primary')
+                ->disabled(),
+
+            // Tombol ke halaman Calendar
+            Actions\Action::make('calendar')
+                ->label('Calendar View')
+                ->icon('heroicon-o-calendar')
+                ->url(fn () => BookingResource::getUrl('calendar'))
+                ->button(),
         ];
     }
 }
