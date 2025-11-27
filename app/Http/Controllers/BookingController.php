@@ -212,7 +212,7 @@ public function checkout(Request $request)
             throw new \Exception('BookingStatus "Pending" tidak ditemukan!');
         }
 
-        // 7. AMBIL HARGA DARI PIVOT (LEBIH AMAN DARIPADA PERCAYA INPUT USER)
+        // 7. AMBIL HARGA DARI PIVOT
         $pivotPrice = DB::table('service_packages')
             ->where('service_id', $service->id)
             ->where('package_id', $package->id)
