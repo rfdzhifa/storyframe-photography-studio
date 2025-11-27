@@ -69,7 +69,7 @@
                     </div>
                 </div>
 
-                <a href="/booking"
+                <a href="{{ route('booking.catalog') }}"
                     class="h-10 md:h-12 px-6 md:px-8 bg-white text-black text-xs md:text-sm font-medium rounded-full hover:bg-blue-100 transition flex justify-center items-center">
                     BOOKING
                 </a>
@@ -208,7 +208,7 @@
                 </div>
             </div>
 
-            <a href="/booking"
+            <a href="{{ route('booking.catalog') }}"
                 class="mt-6 bg-white text-black text-xs md:text-sm font-semibold px-4 md:px-6 py-2 rounded-full hover:bg-blue-100 transition">BOOKING</a>
         </div>
 

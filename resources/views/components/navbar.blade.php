@@ -18,7 +18,7 @@
     </div>
 
     {{-- Desktop Booking Button --}}
-    <a href="{{ route('booking.index') }}"
+    <a href="{{ route('booking.catalog') }}"
       class="hidden lg:flex h-10 lg:h-12 px-4 lg:px-8 bg-blue-600 text-white text-xs lg:text-sm font-medium rounded-full hover:bg-blue-700 transition justify-center items-center">
       BOOKING
     </a>
@@ -42,7 +42,7 @@
       <a href="#contact" class="block text-gray-600 text-sm hover:text-blue-600 transition py-2">CONTACT</a>
 
       <div class="pt-3 border-t border-gray-100">
-        <a href="{{ route('booking.index') }}"
+        <a href="{{ route('booking.catalog') }}"
           class="block w-full h-12 px-6 bg-blue-600 text-white text-sm font-medium rounded-full hover:bg-blue-700 transition flex justify-center items-center">
           BOOKING
         </a>
