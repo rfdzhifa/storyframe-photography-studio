@@ -531,7 +531,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
       try {
         // Create Midtrans transaction
-        const res = await fetch("{{ route('booking.payment.create') }}", {
+        const res = await fetch("{{ route('payment.notification') }}", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

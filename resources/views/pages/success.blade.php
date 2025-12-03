@@ -220,12 +220,19 @@
             </div>
 
             <!-- Action Buttons -->
-            <div class="grid grid-cols-1 sm:grid-cols-1 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <a href="{{ url('/') }}"
-                    class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 px-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center">
+                    class="bg-gray-500 hover:bg-gray-600 text-white font-medium py-3 px-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center">
                     <i class="fas fa-home mr-2"></i>
                     Kembali ke Home
                 </a>
+                @if($bookingData['status'] == 'Pending Payment')
+                    <button id="pay-button"
+                        class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 px-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center">
+                        <i class="fas fa-credit-card mr-2"></i>
+                        Bayar Sekarang
+                    </button>
+                @endif
             </div>
 
             <!-- Help Section -->
@@ -253,4 +260,59 @@
             </div>
         </div>
     </div>
+
+    @if(isset($bookingData['snap_token']))
+        <script src="https://app.sandbox.midtrans.com/snap/snap.js"
+            data-client-key="{{ config('midtrans.client_key') }}"></script>
+        <script type="text/javascript">
+            document.getElementById('pay-button').onclick = function () {
+                // SnapToken acquired from previous step
+                snap.pay('{{ $bookingData['snap_token'] }}', {
+                    // Optional
+                    onSuccess: function (result) {
+                        Swal.fire({
+                            title: 'Pembayaran Berhasil!',
+                            text: 'Terima kasih, pembayaran Anda telah kami terima.',
+                            icon: 'success',
+                            confirmButtonText: 'OK',
+                            confirmButtonColor: '#3b82f6'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                window.location.reload();
+                            }
+                        });
+                    },
+                    // Optional
+                    onPending: function (result) {
+                        Swal.fire({
+                            title: 'Menunggu Pembayaran',
+                            text: 'Silakan selesaikan pembayaran Anda.',
+                            icon: 'info',
+                            confirmButtonText: 'OK',
+                            confirmButtonColor: '#3b82f6'
+                        });
+                    },
+                    // Optional
+                    onError: function (result) {
+                        Swal.fire({
+                            title: 'Pembayaran Gagal',
+                            text: 'Terjadi kesalahan saat memproses pembayaran. Silakan coba lagi.',
+                            icon: 'error',
+                            confirmButtonText: 'Tutup',
+                            confirmButtonColor: '#ef4444'
+                        });
+                    },
+                    onClose: function () {
+                        Swal.fire({
+                            title: 'Pembayaran Dibatalkan',
+                            text: 'Anda menutup popup pembayaran sebelum menyelesaikan transaksi.',
+                            icon: 'warning',
+                            confirmButtonText: 'OK',
+                            confirmButtonColor: '#f59e0b'
+                        });
+                    }
+                });
+            };
+        </script>
+    @endif
 @endsection

@@ -2,116 +2,75 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Booking;
+use App\Models\BookingStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Midtrans\Config;
-use Midtrans\Snap;
+use Midtrans\Notification;
 
 class PaymentController extends Controller
 {
-    public function createTransaction(Request $request)
+    public function __construct()
     {
-       try {
-            // Log incoming request untuk debugging
-            Log::info('Payment request received', [
-                'amount' => $request->amount,
-                'full_name' => $request->full_name,
-                'email' => $request->email,
-            ]);
+        Config::$serverKey = config('midtrans.server_key');
+        Config::$isProduction = config('midtrans.is_production');
+        Config::$isSanitized = config('midtrans.is_sanitized');
+        Config::$is3ds = config('midtrans.is_3ds');
+    }
 
-            // Validasi input
-            $validated = $request->validate([
-                'amount' => 'required|numeric|min:1',
-                'full_name' => 'required|string|max:255',
-                'email' => 'required|email',
-                'phone_number' => 'nullable|string',
-            ]);
+    public function notification(Request $request)
+    {
+        try {
+            $notification = new Notification();
 
-            // Set Midtrans Configuration
-            Config::$serverKey = config('services.midtrans.server_key');
-            Config::$isProduction = config('services.midtrans.is_production', false);
-            Config::$isSanitized = true;
-            Config::$is3ds = true;
+            $transaction = $notification->transaction_status;
+            $type = $notification->payment_type;
+            $orderId = $notification->order_id;
+            $fraud = $notification->fraud_status;
 
-            // Generate unique Order ID
-            $orderId = 'BOOKING-' . time() . '-' . rand(1000, 9999);
+            $booking = Booking::where('booking_code', $orderId)->firstOrFail();
 
-            // Prepare transaction parameters
-            $params = [
-                'transaction_details' => [
-                    'order_id' => $orderId,
-                    'gross_amount' => (int) $validated['amount'],
-                ],
-                'customer_details' => [
-                    'first_name' => $validated['full_name'],
-                    'email' => $validated['email'],
-                    'phone' => $validated['phone_number'] ?? '',
-                ],
-                'item_details' => [
-                    [
-                        'id' => 'booking-' . time(),
-                        'price' => (int) $validated['amount'],
-                        'quantity' => 1,
-                        'name' => 'Booking Payment',
-                    ]
-                ],
-            ];
+            if ($transaction == 'capture') {
+                if ($type == 'credit_card') {
+                    if ($fraud == 'challenge') {
+                        $this->updateStatus($booking, 'Pending Payment'); // Atau status lain yang sesuai
+                    } else {
+                        $this->updateStatus($booking, 'Paid - Full'); // Asumsi full payment untuk CC
+                    }
+                }
+            } else if ($transaction == 'settlement') {
+                // Cek apakah DP atau Full
+                if ($booking->payment_option == 'dp') {
+                    $this->updateStatus($booking, 'Paid - DP');
+                } else {
+                    $this->updateStatus($booking, 'Paid - Full');
+                }
+            } else if ($transaction == 'pending') {
+                $this->updateStatus($booking, 'Pending Payment');
+            } else if ($transaction == 'deny') {
+                $this->updateStatus($booking, 'Cancelled');
+            } else if ($transaction == 'expire') {
+                $this->updateStatus($booking, 'Cancelled');
+            } else if ($transaction == 'cancel') {
+                $this->updateStatus($booking, 'Cancelled');
+            }
 
-            Log::info('Midtrans params', $params);
-
-            Log::info('Midtrans config check', [
-                'server_key' => config('services.midtrans.server_key'),
-                'is_production' => config('services.midtrans.is_production'),
-            ]);
-
-
-            // Get Snap Token from Midtrans
-            $snapToken = Snap::getSnapToken($params);
-
-            Log::info('Snap token generated', ['token' => $snapToken]);
-
-            return response()->json([
-                'success' => true,
-                'snapToken' => $snapToken,
-                'order_id' => $orderId,
-            ]);
-
-        } catch (\Midtrans\Exceptions\InputValidationException $e) {
-            Log::error('Midtrans Input Validation Error', [
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'error' => 'Data tidak valid',
-                'message' => $e->getMessage(),
-            ], 422);
-
-        } catch (\Midtrans\Exceptions\ApiException $e) {
-            Log::error('Midtrans API Error', [
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'error' => 'Midtrans API Error',
-                'message' => $e->getMessage(),
-            ], 500);
+            return response()->json(['message' => 'Payment status updated']);
 
         } catch (\Exception $e) {
-            Log::error('Payment creation error', [
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'error' => 'Terjadi kesalahan server',
-                'message' => $e->getMessage(),
-            ], 500);
+            Log::error('Payment Notification Error: ' . $e->getMessage());
+            return response()->json(['message' => 'Error processing notification'], 500);
         }
     }
 
+    private function updateStatus(Booking $booking, $statusName)
+    {
+        $status = BookingStatus::where('name', $statusName)->first();
+        if ($status) {
+            $booking->booking_status_id = $status->id;
+            $booking->payment_status = strtolower(str_replace(' ', '_', $statusName)); // e.g., paid_full
+            $booking->save();
+        }
+    }
 }
