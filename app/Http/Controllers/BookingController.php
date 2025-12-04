@@ -283,11 +283,11 @@ class BookingController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => 'Booking sukses! Kode booking kamu: ' . $booking->booking_code,
+                    'snap_token' => $snapToken,
+                    'redirect_url' => $redirectUrl,
                     'data' => [
                         'booking_id' => $booking->id,
                         'booking_code' => $booking->booking_code,
-                        'redirect_url' => $redirectUrl,
-                        'snap_token' => $snapToken,
                     ],
                 ], 201);
             }

@@ -2,7 +2,6 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\BookingController; // Pastikan ini di-import
-use App\Http\Controllers\PaymentController; // Pastikan ini di-import
 
 /*
 |--------------------------------------------------------------------------
@@ -46,4 +45,4 @@ Route::prefix('booking')->name('booking.')->group(function () {
 
 // Midtrans Notification Route (Exclude from CSRF in VerifyCsrfToken middleware if needed, or use API route)
 // For simplicity in this setup, we'll put it here but remember to exclude it from CSRF protection
-Route::post('/payment/notification', [PaymentController::class, 'notification'])->name('payment.notification');
+Route::post('/payment/notification', [\App\Http\Controllers\PaymentController::class, 'notification'])->name('payment.notification');

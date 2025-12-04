@@ -257,6 +257,9 @@
   </div>
 </form>
 
+<script src="https://app.sandbox.midtrans.com/snap/snap.js"
+    data-client-key="{{ config('midtrans.client_key') }}"></script>
+
 {{-- MODAL KONFIRMASI (PAKAI PUNYA KAMU) --}}
 <div id="confirmModal" class="relative z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
   <!-- Backdrop -->
@@ -299,310 +302,246 @@
   </div>
 </div>
 
-<script type="text/javascript" src="https://app.sandbox.midtrans.com/snap/snap.js"
-  data-client-key="{{ config('services.midtrans.client_key') }}">
-
-</script>
-
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-  // ==========================================
-  // HELPER FUNCTIONS
-  // ==========================================
-  function setText(id, value, fallback = '-') {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.textContent = value && value.trim() !== '' ? value : fallback;
-  }
-
-  function formatRupiah(num) {
-    return 'Rp ' + num.toLocaleString('id-ID');
-  }
-
-  // ==========================================
-  // REAL-TIME SYNC: FULL NAME
-  // ==========================================
-  const fullNameInput = document.getElementById('full_name');
-  if (fullNameInput) {
-    const syncFullName = () => setText('summaryFullName', fullNameInput.value);
-    syncFullName();
-    fullNameInput.addEventListener('input', syncFullName);
-  }
-
-  // ==========================================
-  // REAL-TIME SYNC: EMAIL
-  // ==========================================
-  const emailInput = document.getElementById('email');
-  if (emailInput) {
-    const syncEmail = () => setText('summaryEmail', emailInput.value);
-    syncEmail();
-    emailInput.addEventListener('input', syncEmail);
-  }
-
-  // ==========================================
-  // REAL-TIME SYNC: PHONE
-  // ==========================================
-  const phoneInput = document.getElementById('phone_number');
-  if (phoneInput) {
-    const syncPhone = () => setText('summaryPhone', phoneInput.value);
-    syncPhone();
-    phoneInput.addEventListener('input', syncPhone);
-  }
-
-  // ==========================================
-  // REAL-TIME SYNC: PAYMENT + DP CALCULATION
-  // ==========================================
-  const paymentRadios = document.querySelectorAll('input[name="payment"]');
-  const priceRaw = {{ (int) ($booking['price'] ?? 0) }};
-  const dpRow = document.getElementById('summaryDpRow');
-  const dpAmount = document.getElementById('summaryDpAmount');
-
-  function updatePaymentSummary() {
-    let selected = 'dp';
-    paymentRadios.forEach(r => {
-      if (r.checked) selected = r.value;
-    });
-
-    if (selected === 'full') {
-      setText('summaryPayment', 'Full Payment');
-      if (dpRow) dpRow.classList.add('hidden');
-    } else {
-      setText('summaryPayment', 'Down Payment (50%)');
-      if (dpRow && dpAmount) {
-        dpRow.classList.remove('hidden');
-        const dp = Math.round(priceRaw * 0.5);
-        dpAmount.textContent = formatRupiah(dp);
-      }
-    }
-  }
-
-  if (paymentRadios.length) {
-    updatePaymentSummary();
-    paymentRadios.forEach(r => r.addEventListener('change', updatePaymentSummary));
-  }
-
-  // ==========================================
-  // REAL-TIME SYNC: NOTES
-  // ==========================================
-  const notesInput = document.getElementById('notes');
-  if (notesInput) {
-    const syncNotes = () => setText('summaryNotes', notesInput.value, '-');
-    syncNotes();
-    notesInput.addEventListener('input', syncNotes);
-  }
-
-  // ==========================================
-  // MODAL FUNCTIONS
-  // ==========================================
-  const modal = document.getElementById('confirmModal');
-
-  function openModal() {
-    if (!modal) return;
-    modal.classList.remove('hidden');
-    document.body.classList.add('overflow-hidden');
-  }
-
-  function closeModal() {
-    if (!modal) return;
-    modal.classList.add('hidden');
-    document.body.classList.remove('overflow-hidden');
-  }
-
-  // ==========================================
-  // ERROR HANDLING FUNCTIONS
-  // ==========================================
-  function clearClientErrors() {
-    document.querySelectorAll('.client-error').forEach(el => el.remove());
-  }
-
-  function showFieldError(inputEl, message) {
-    if (!inputEl) return;
-    const wrapper = inputEl.closest('.w-full') || inputEl.parentElement;
-    if (!wrapper) return;
-
-    let errorEl = wrapper.querySelector('.client-error');
-    if (!errorEl) {
-      errorEl = document.createElement('p');
-      errorEl.className = 'client-error text-sm text-red-500 mt-1';
-      wrapper.appendChild(errorEl);
-    }
-    errorEl.textContent = message;
-  }
-
-  function showPaymentError(message) {
-    const paymentWrapper = document.getElementById('payment-wrapper');
-    if (!paymentWrapper) return;
-
-    let errorEl = paymentWrapper.querySelector('.client-error');
-    if (!errorEl) {
-      errorEl = document.createElement('p');
-      errorEl.className = 'client-error text-sm text-red-500 mt-1';
-      paymentWrapper.appendChild(errorEl);
-    }
-    errorEl.textContent = message;
-  }
-
-  // ==========================================
-  // FORM VALIDATION
-  // ==========================================
-  function validateForm() {
-    clearClientErrors();
-    let valid = true;
-
-    const fullName = document.getElementById('full_name');
-    const email = document.getElementById('email');
-    const phone = document.getElementById('phone_number');
-
-    if (!fullName || !email || !phone) return false;
-
-    if (!fullName.value.trim()) {
-      showFieldError(fullName, 'Full name wajib diisi.');
-      valid = false;
+  document.addEventListener('DOMContentLoaded', function () {
+    // helper
+    function setText(id, value, fallback = '-') {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = value && value.trim() !== '' ? value : fallback;
     }
 
-    if (!email.value.trim()) {
-      showFieldError(email, 'Email wajib diisi.');
-      valid = false;
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
-      showFieldError(email, 'Format email tidak valid.');
-      valid = false;
+    // === Full name ===
+    const fullNameInput = document.getElementById('full_name');
+    if (fullNameInput) {
+      const syncFullName = () => setText('summaryFullName', fullNameInput.value);
+      syncFullName();
+      fullNameInput.addEventListener('input', syncFullName);
     }
 
-    if (!phone.value.trim()) {
-      showFieldError(phone, 'Phone Number wajib diisi.');
-      valid = false;
+    // === Email ===
+    const emailInput = document.getElementById('email');
+    if (emailInput) {
+      const syncEmail = () => setText('summaryEmail', emailInput.value);
+      syncEmail();
+      emailInput.addEventListener('input', syncEmail);
     }
 
-    let paymentSelected = false;
-    paymentRadios.forEach(r => {
-      if (r.checked) paymentSelected = true;
-    });
-    if (!paymentSelected) {
-      showPaymentError('Pilih salah satu opsi pembayaran.');
-      valid = false;
+    // === Phone ===
+    const phoneInput = document.getElementById('phone_number');
+    if (phoneInput) {
+      const syncPhone = () => setText('summaryPhone', phoneInput.value);
+      syncPhone();
+      phoneInput.addEventListener('input', syncPhone);
     }
 
-    return valid;
-  }
+    // === Payment (DP / Full) + DP Amount ===
+    const paymentRadios = document.querySelectorAll('input[name="payment"]');
+    const priceRaw = {{ (int) ($booking['price'] ?? 0) }}; // dari PHP ke JS number
+    const dpRow = document.getElementById('summaryDpRow');
+    const dpAmount = document.getElementById('summaryDpAmount');
 
-  // ==========================================
-  // FORM SUBMIT HANDLER
-  // ==========================================
-  const form = document.getElementById('booking-form');
-  const confirmYesBtn = document.getElementById('confirmYes');
-  const confirmNoBtn = document.getElementById('confirmNo');
+    function formatRupiah(num) {
+      return 'Rp ' + num.toLocaleString('id-ID');
+    }
 
-  if (form) {
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
-
-      if (!validateForm()) {
-        const firstError = document.querySelector('.client-error');
-        if (firstError) {
-          firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-        return;
-      }
-
-      openModal();
-    });
-  }
-
-  // ==========================================
-  // CONFIRM PAYMENT BUTTON
-  // ==========================================
-  if (confirmYesBtn && form) {
-    confirmYesBtn.addEventListener('click', async function () {
-      closeModal();
-
-      // Determine payment type
-      let selectedPayment = 'dp';
+    function updatePaymentSummary() {
+      let selected = 'dp';
       paymentRadios.forEach(r => {
-        if (r.checked) selectedPayment = r.value;
+        if (r.checked) selected = r.value;
       });
 
-      // Calculate amount to pay
-      const amountToPay = selectedPayment === 'full' 
-        ? priceRaw 
-        : Math.round(priceRaw * 0.5);
-
-      console.log('Payment Type:', selectedPayment);
-      console.log('Amount to Pay:', amountToPay);
-
-      try {
-        // Create Midtrans transaction
-        const res = await fetch("{{ route('payment.notification') }}", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-          },
-          body: JSON.stringify({
-            amount: amountToPay,
-            full_name: document.getElementById('full_name').value,
-            email: document.getElementById('email').value,
-            phone_number: document.getElementById('phone_number').value,
-          }),
-        });
-
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
+      if (selected === 'full') {
+        setText('summaryPayment', 'Full Payment');
+        if (dpRow) dpRow.classList.add('hidden');
+      } else {
+        setText('summaryPayment', 'Down Payment (50%)');
+        if (dpRow && dpAmount) {
+          dpRow.classList.remove('hidden');
+          const dp = Math.round(priceRaw * 0.5);
+          dpAmount.textContent = formatRupiah(dp);
         }
-
-        const data = await res.json();
-        console.log('Server Response:', data);
-
-        if (!data.snapToken) {
-          alert("Gagal membuat transaksi: " + (data.error || data.message || 'Unknown error'));
-          console.error('No snapToken received:', data);
-          return;
-        }
-
-        // Check if Snap is loaded
-        if (typeof window.snap === 'undefined') {
-          alert("Midtrans Snap belum dimuat. Refresh halaman dan coba lagi.");
-          console.error('window.snap is undefined');
-          return;
-        }
-
-        // Open Midtrans Snap popup
-        window.snap.pay(data.snapToken, {
-          onSuccess: function (result) {
-            console.log('Payment Success:', result);
-            // Submit form after successful payment
-            form.submit();
-          },
-          onPending: function (result) {
-            console.log('Payment Pending:', result);
-            alert('Pembayaran pending. Silakan selesaikan pembayaran Anda.');
-            // Optional: submit form even if pending
-            // form.submit();
-          },
-          onError: function (result) {
-            console.error('Payment Error:', result);
-            alert('Pembayaran gagal: ' + (result.status_message || 'Silakan coba lagi'));
-          },
-          onClose: function () {
-            console.log('Payment popup closed by user');
-          }
-        });
-
-      } catch (err) {
-        console.error('Fetch Error:', err);
-        alert("Terjadi error saat memproses pembayaran: " + err.message);
       }
-    });
-  }
+    }
 
-  // ==========================================
-  // CANCEL BUTTON
-  // ==========================================
-  if (confirmNoBtn) {
-    confirmNoBtn.addEventListener('click', function () {
-      closeModal();
-    });
-  }
-});
+    if (paymentRadios.length) {
+      updatePaymentSummary();
+      paymentRadios.forEach(r => r.addEventListener('change', updatePaymentSummary));
+    }
+
+    // === Notes ===
+    const notesInput = document.getElementById('notes');
+    if (notesInput) {
+      const syncNotes = () => setText('summaryNotes', notesInput.value, '-');
+      syncNotes();
+      notesInput.addEventListener('input', syncNotes);
+    }
+
+    // ================================
+    //  FORM SUBMIT + MODAL + VALIDASI
+    // ================================
+    const form = document.getElementById('booking-form');
+    const modal = document.getElementById('confirmModal');
+    const confirmYesBtn = document.getElementById('confirmYes');
+    const confirmNoBtn = document.getElementById('confirmNo');
+
+    function openModal() {
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      document.body.classList.add('overflow-hidden');
+    }
+
+    function closeModal() {
+      if (!modal) return;
+      modal.classList.add('hidden');
+      document.body.classList.remove('overflow-hidden');
+    }
+
+    // Hapus error-error front-end sebelumnya
+    function clearClientErrors() {
+      document.querySelectorAll('.client-error').forEach(el => el.remove());
+    }
+
+    // Tampilkan error di bawah input text
+    function showFieldError(inputEl, message) {
+      if (!inputEl) return;
+      const wrapper = inputEl.closest('.w-full') || inputEl.parentElement;
+      if (!wrapper) return;
+
+      let errorEl = wrapper.querySelector('.client-error');
+      if (!errorEl) {
+        errorEl = document.createElement('p');
+        errorEl.className = 'client-error text-sm text-red-500 mt-1';
+        wrapper.appendChild(errorEl);
+      }
+      errorEl.textContent = message;
+    }
+
+    // Error khusus payment (radio)
+    function showPaymentError(message) {
+      const paymentWrapper = document.getElementById('payment-wrapper');
+      if (!paymentWrapper) return;
+
+      let errorEl = paymentWrapper.querySelector('.client-error');
+      if (!errorEl) {
+        errorEl = document.createElement('p');
+        errorEl.className = 'client-error text-sm text-red-500 mt-1';
+        paymentWrapper.appendChild(errorEl);
+      }
+      errorEl.textContent = message;
+    }
+
+    // Validasi front-end
+    function validateForm() {
+      clearClientErrors();
+      let valid = true;
+
+      const fullName = document.getElementById('full_name');
+      const email = document.getElementById('email');
+      const phone = document.getElementById('phone_number');
+
+      if (!fullName || !email || !phone) return false;
+
+      if (!fullName.value.trim()) {
+        showFieldError(fullName, 'Full name wajib diisi.');
+        valid = false;
+      }
+
+      if (!email.value.trim()) {
+        showFieldError(email, 'Email wajib diisi.');
+        valid = false;
+      }
+
+      if (!phone.value.trim()) {
+        showFieldError(phone, 'Phone Number wajib diisi.');
+        valid = false;
+      }
+
+      let paymentSelected = false;
+      paymentRadios.forEach(r => {
+        if (r.checked) paymentSelected = true;
+      });
+      if (!paymentSelected) {
+        showPaymentError('Pilih salah satu opsi pembayaran.');
+        valid = false;
+      }
+
+      return valid;
+    }
+
+    // Intercept submit form → validasi → kalau lolos, baru buka modal
+    if (form) {
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        if (!validateForm()) {
+          const firstError = document.querySelector('.client-error');
+          if (firstError) {
+            firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          return;
+        }
+
+        openModal();
+      });
+    }
+
+    // Tombol "Ya, lanjut" → tutup modal + submit ke server untuk dapat snap_token
+    if (confirmYesBtn && form) {
+      confirmYesBtn.addEventListener('click', function () {
+        closeModal();
+
+        // Submit form via AJAX untuk mendapatkan snap_token
+        const formData = new FormData(form);
+        const actionUrl = form.getAttribute('data-url') || form.action;
+
+        fetch(actionUrl, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.snap_token) {
+            // Trigger Midtrans Snap
+            snap.pay(data.snap_token, {
+              onSuccess: function(result) {
+                window.location.href = data.redirect_url || '/success';
+              },
+              onPending: function(result) {
+                alert('Menunggu pembayaran. Silakan selesaikan pembayaran Anda.');
+                window.location.href = data.redirect_url || '/success';
+              },
+              onError: function(result) {
+                alert('Pembayaran gagal. Silakan coba lagi.');
+              },
+              onClose: function() {
+                alert('Anda menutup popup pembayaran sebelum menyelesaikan transaksi.');
+              }
+            });
+          } else if (data.redirect_url) {
+            // Jika tidak ada snap_token (full payment atau error), redirect langsung
+            window.location.href = data.redirect_url;
+          } else {
+            alert('Terjadi kesalahan. Silakan coba lagi.');
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('Terjadi kesalahan koneksi. Silakan coba lagi.');
+        });
+      });
+    }
+
+    // Tombol "Batal" → cuma tutup modal
+    if (confirmNoBtn) {
+      confirmNoBtn.addEventListener('click', function () {
+        closeModal();
+      });
+    }
+  });
 </script>
 
 @endsection
