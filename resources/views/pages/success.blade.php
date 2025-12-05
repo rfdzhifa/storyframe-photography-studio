@@ -2,7 +2,7 @@
 
 @extends('app')
 
-@section('title', 'Booking Berhasil')
+@section('title', 'Status Booking & Pembayaran')
 
 @push('styles')
     <style>
@@ -52,36 +52,58 @@
 @section('content')
     <div class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12 px-4">
         <div class="max-w-4xl mx-auto animate-fade-in-up">
-            <!-- Success Header -->
-<div class="text-center mb-8">
-    <div
-        class="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-4 animate-pulse-slow">
-        <i class="fas fa-check text-3xl text-blue-500">🎉</i>
-    </div>
 
-    @if($paymentState === 'success')
-        <h1 class="text-3xl font-bold text-gray-800 mb-2">Booking & Pembayaran Berhasil</h1>
-        <p class="text-gray-600">
-            Pembayaran kamu sudah kami terima. Jadwal foto kamu sudah <span class="font-semibold">fix</span>.
-        </p>
+            <!-- Header -->
+            <div class="text-center mb-8">
+            {{-- ICON STATUS --}}
+            <div
+                @if($paymentState === 'success')
+                    class="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4 animate-pulse-slow bg-green-100"
+                @elseif($paymentState === 'pending')
+                    class="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4 animate-pulse-slow bg-yellow-100"
+                @elseif($paymentState === 'failed')
+                    class="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4 animate-pulse-slow bg-red-100"
+                @else
+                    class="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4 animate-pulse-slow bg-blue-100"
+                @endif
+            >
+                <span class="text-3xl">
+                    @if($paymentState === 'success')
+                        🎉
+                    @elseif($paymentState === 'pending')
+                        ⏳
+                    @elseif($paymentState === 'failed')
+                        ❌
+                    @else
+                        📄
+                    @endif
+                </span>
+            </div>
 
-    @elseif($paymentState === 'pending')
-        <h1 class="text-3xl font-bold text-gray-800 mb-2">Booking Berhasil Dibuat</h1>
-        <p class="text-gray-600">
-            Data booking sudah tersimpan. Selesaikan pembayaran dulu supaya slot kamu tidak dibatalkan.
-        </p>
+            {{-- TITLE + TEXT --}}
+            @if($paymentState === 'success')
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">Booking & Pembayaran Berhasil</h1>
+                <p class="text-gray-600">
+                    Pembayaran kamu sudah kami terima. Jadwal foto kamu sudah <span class="font-semibold">fix</span>.
+                </p>
 
-    @elseif($paymentState === 'failed')
-        <h1 class="text-3xl font-bold text-gray-800 mb-2">Booking Dibatalkan</h1>
-        <p class="text-gray-600">
-            Pembayaran tidak berhasil atau sudah kedaluwarsa. Silakan buat booking baru jika masih ingin lanjut.
-        </p>
+            @elseif($paymentState === 'pending')
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">Booking Berhasil Dibuat</h1>
+                <p class="text-gray-600">
+                    Data booking sudah tersimpan. Selesaikan pembayaran dulu supaya slot kamu tidak dibatalkan.
+                </p>
 
-    @else
-        <h1 class="text-3xl font-bold text-gray-800 mb-2">Status Booking</h1>
-        <p class="text-gray-600">Silakan cek detail booking di bawah ini.</p>
-    @endif
-</div>
+            @elseif($paymentState === 'failed')
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">Booking Dibatalkan</h1>
+                <p class="text-gray-600">
+                    Pembayaran tidak berhasil atau sudah kedaluwarsa. Silakan buat booking baru jika masih ingin lanjut.
+                </p>
+
+            @else
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">Status Booking & Pembayaran</h1>
+                <p class="text-gray-600">Silakan cek detail booking di bawah ini.</p>
+            @endif
+        </div>
 
             <!-- Main Booking Card -->
             <div class="bg-white rounded-2xl card-shadow overflow-hidden mb-6">
