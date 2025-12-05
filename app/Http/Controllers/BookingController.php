@@ -145,9 +145,9 @@ class BookingController extends Controller
 
         $booking = [
             'service_id' => $service->id,
-            'service_name' => $service->name,
+            'service_name' => optional($service)->name ?? '',
             'package_id' => $package->id,
-            'package_name' => $package->name,
+            'package_name' => optional($package)->name ?? '',
             'price' => (int) $price,
             'booking_date' => $request->input('date'),  // dari query ?date=
             'preferred_time' => $request->input('time'),  // dari query ?time=
@@ -326,22 +326,37 @@ class BookingController extends Controller
 
         // Generate Snap Token jika status masih pending
         $snapToken = null;
-        if ($booking->bookingStatus->name == 'Pending Payment') {
-            $params = [
-                'transaction_details' => [
-                    'order_id' => $booking->booking_code,
-                    'gross_amount' => (int) $booking->total_price,
-                ],
-                'customer_details' => [
-                    'first_name' => $booking->customer_name,
-                    'email' => $booking->customer_email,
-                    'phone' => $booking->customer_phone,
-                ],
-            ];
+        if ($booking->bookingStatus?->name == 'Pending Payment') {
             try {
+                $params = [
+                    'transaction_details' => [
+                        'order_id' => $booking->booking_code,
+                        'gross_amount' => (int) $booking->total_price,
+                    ],
+                    'customer_details' => [
+                        'first_name' => $booking->customer_name,
+                        'email' => $booking->customer_email,
+                        'phone' => $booking->customer_phone,
+                    ],
+                    'item_details' => [
+                        [
+                            'id' => 'booking-' . $booking->id,
+                            'price' => (int) $booking->total_price,
+                            'quantity' => 1,
+                            'name' => $booking->service->name . ' - ' . $booking->package->name
+                        ]
+                    ],
+                ];
                 $snapToken = Snap::getSnapToken($params);
+                Log::info('Snap token generated on page load', [
+                    'booking_id' => $booking->id,
+                    'token' => substr($snapToken, 0, 20) . '...'
+                ]);
             } catch (\Exception $e) {
-                Log::error('Midtrans Error: ' . $e->getMessage());
+                Log::error('Midtrans Error on page load: ' . $e->getMessage(), [
+                    'booking_id' => $booking->id
+                ]);
+                // Jangan error, biarkan generate di client-side
             }
         }
 
@@ -351,21 +366,32 @@ class BookingController extends Controller
             'customer_name' => $booking->customer_name,
             'customer_email' => $booking->customer_email,
             'customer_phone' => $booking->customer_phone,
-            'service_name' => $booking->service->name,
-            'package_name' => $booking->package->name,
+            'service_name' => $booking->service?->name ?? '',
+            'package_name' => $booking->package?->name ?? '',
             'booking_date' => Carbon::parse($booking->booking_date)->format('d F Y'),
             'start_time' => Carbon::parse($booking->start_time)->format('H:i'),
             'end_time' => Carbon::parse($booking->end_time)->format('H:i'),
             'total_price' => number_format($booking->total_price, 0, ',', '.'),
             'payment_option' => $booking->payment_option === 'dp' ? 'Down Payment (50%)' : 'Full Payment',
             'down_payment_amount' => $booking->down_payment_amount ? number_format($booking->down_payment_amount, 0, ',', '.') : null,
-            'status' => $booking->bookingStatus->name,
+                'status' => $booking->bookingStatus?->name ?? 'Unknown',
             'notes' => $booking->notes,
             'created_at' => $booking->created_at->format('d F Y, H:i'),
             'snap_token' => $snapToken,
         ];
 
-        return view('pages.success', compact('booking', 'bookingData'));
+        // Determine payment state for display
+        $paymentState = 'pending';
+        $statusName = $booking->bookingStatus?->name ?? '';
+        if ($statusName !== '' && strpos($statusName, 'Paid') !== false) {
+            $paymentState = 'success';
+        } elseif ($statusName === 'Cancelled' || $statusName === 'Rejected') {
+            $paymentState = 'failed';
+        } elseif ($statusName === 'Pending Payment') {
+            $paymentState = 'pending';
+        }
+
+        return view('pages.success', compact('booking', 'bookingData', 'paymentState'));
     }
 
     /**
@@ -411,6 +437,40 @@ class BookingController extends Controller
         ]);
 
         return view('pages.detail', compact('service'));
+    }
+
+    /**
+     * API endpoint untuk refresh status booking
+     */
+    public function getBookingStatus(Booking $booking)
+    {
+        try {
+            $booking->load(['bookingStatus']);
+
+            // Tentukan payment state
+            $paymentState = 'pending';
+            $statusName = $booking->bookingStatus?->name ?? '';
+            if ($statusName !== '' && strpos($statusName, 'Paid') !== false) {
+                $paymentState = 'success';
+            } elseif ($statusName === 'Cancelled' || $statusName === 'Rejected') {
+                $paymentState = 'failed';
+            } elseif ($statusName === 'Pending Payment') {
+                $paymentState = 'pending';
+            }
+
+            return response()->json([
+                'success' => true,
+                'status' => $booking->bookingStatus?->name ?? 'Unknown',
+                'payment_state' => $paymentState,
+                'payment_status' => $booking->payment_status,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching booking status: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil status booking'
+            ], 500);
+        }
     }
 
 }

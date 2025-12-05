@@ -5,6 +5,30 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Str;
 
+/**
+ * @property int $id
+ * @property string $booking_code
+ * @property string $customer_name
+ * @property string $customer_email
+ * @property string $customer_phone
+ * @property int $service_id
+ * @property int $package_id
+ * @property int $booking_status_id
+ * @property \Illuminate\Support\Carbon $booking_date
+ * @property string $start_time
+ * @property string $end_time
+ * @property float $total_price
+ * @property string|null $notes
+ * @property string $payment_option
+ * @property float|null $down_payment_amount
+ * @property string $payment_status
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ *
+ * @property-read \App\Models\Service|null $service
+ * @property-read \App\Models\Package|null $package
+ * @property-read \App\Models\BookingStatus|null $bookingStatus
+ */
 class Booking extends Model
 {
     use HasFactory;
@@ -15,7 +39,7 @@ class Booking extends Model
         'customer_email',
         'customer_phone',
         'service_id',
-        'package_id', 
+        'package_id',
         'booking_status_id',
         'booking_date',
         'start_time',
@@ -26,7 +50,7 @@ class Booking extends Model
         'down_payment_amount',
         'payment_status',
     ];
-    
+
 
     protected $casts = [
         'booking_date' => 'date',
@@ -57,12 +81,12 @@ class Booking extends Model
     {
         return $this->start_time < $end && $this->end_time > $start;
     }
-    
+
     public function getRouteKeyName()
     {
         return 'booking_code';
     }
-    
+
     protected static function booted()
 {
     static::creating(function ($booking) {

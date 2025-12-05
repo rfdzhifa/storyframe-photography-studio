@@ -12,6 +12,21 @@ class Package extends Model
     use HasFactory;
 
     /**
+     * @property int $id
+     * @property string $name
+     * @property string|null $description
+     * @property int $duration_minutes
+     * @property int $max_photos
+     * @property bool $includes_editing
+     * @property bool $is_active
+     * @property \Illuminate\Support\Carbon|null $created_at
+     * @property \Illuminate\Support\Carbon|null $updated_at
+     *
+     * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Service[] $services
+     * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Booking[] $bookings
+     */
+
+    /**
      * @var array<int, string>
      */
     protected $fillable = [

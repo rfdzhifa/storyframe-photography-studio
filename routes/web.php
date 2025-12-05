@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\BookingController; // Pastikan ini di-import
+use App\Http\Controllers\PaymentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -41,8 +42,11 @@ Route::prefix('booking')->name('booking.')->group(function () {
 
     // Booking success page
     Route::get('/success/{booking}', [BookingController::class, 'success'])->name('success');
+
+    // API: Get booking status (for refresh)
+    Route::get('/{booking}/status', [BookingController::class, 'getBookingStatus'])->name('status');
 });
 
 // Midtrans Notification Route (Exclude from CSRF in VerifyCsrfToken middleware if needed, or use API route)
 // For simplicity in this setup, we'll put it here but remember to exclude it from CSRF protection
-Route::post('/payment/notification', [\App\Http\Controllers\PaymentController::class, 'notification'])->name('payment.notification');
+Route::post('/payment/notification', [PaymentController::class, 'notification'])->name('payment.notification');
