@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Mail;
 use App\Mail\BookingSuccessMail;
 use Midtrans\Config;
 use Midtrans\Snap;
+use App\Jobs\ReleaseBookingIfUnpaid;
 
 class BookingController extends Controller
 {
@@ -81,8 +82,18 @@ class BookingController extends Controller
             ->where('is_active', true)
             ->value('service_id');
 
+        $now = now();
+
+        // Consider bookings for the same service + package that are not cancelled.
+        // Pending bookings should reserve the slot until they are released/cancelled.
+        // Only consider bookings that are not expired (paid OR pending but not yet expired)
         $bookedSlots = Booking::whereDate('booking_date', $date->toDateString())
             ->where('service_id', $serviceId)
+            ->where('package_id', $packageId)
+            ->whereHas('bookingStatus', function ($q) {
+                $q->whereNotIn('name', ['Cancelled', 'Rejected']);
+            })
+            ->notExpired() // scope on Booking model: excludes pending-but-expired bookings
             ->get();
 
         // Ambil array dari waktu mulai booking
@@ -157,170 +168,204 @@ class BookingController extends Controller
     }
 
     // proses ketika klik "Bayar Sekarang"
-    public function store(Request $request)
-    {
-        // 1. VALIDASI INPUT DARI HALAMAN CHECKOUT
-        $validated = $request->validate([
-            'full_name' => 'required|string|max:255',
-            'email' => 'required|email',
-            'phone_number' => 'required|string|max:20',
-            'payment' => 'required|in:dp,full',   // dp / full
-            'notes' => 'nullable|string',
-            'service' => 'required|exists:services,id',
-            'package' => 'required|exists:packages,id',
-            'price' => 'required|numeric',
-            'booking_date' => 'required|date_format:Y-m-d|after_or_equal:today|before_or_equal:' . Carbon::today()->addDays(30)->toDateString(),
-            'preferred_time' => 'required|date_format:H:i',
+public function store(Request $request)
+{
+    // 1. VALIDASI INPUT DARI HALAMAN CHECKOUT
+    $validated = $request->validate([
+        'full_name'      => 'required|string|max:255',
+        'email'          => 'required|email',
+        'phone_number'   => 'required|string|max:20',
+        'payment'        => 'required|in:dp,full',   // dp / full
+        'notes'          => 'nullable|string',
+        'service'        => 'required|exists:services,id',
+        'package'        => 'required|exists:packages,id',
+        'price'          => 'required|numeric',
+        'booking_date'   => 'required|date_format:Y-m-d|after_or_equal:today|before_or_equal:' . Carbon::today()->addDays(30)->toDateString(),
+        'preferred_time' => 'required|date_format:H:i',
+    ]);
+
+    DB::beginTransaction();
+
+    try {
+        // 2. AMBIL SERVICE & PACKAGE
+        $service  = Service::findOrFail($validated['service']);
+        $package  = Package::findOrFail($validated['package']);
+        $duration = (int) $package->duration_minutes;
+
+        // 3. HITUNG WAKTU MULAI & SELESAI
+        $bookingDate = Carbon::parse($validated['booking_date']);
+
+        $startTime = Carbon::createFromFormat(
+            'Y-m-d H:i',
+            $bookingDate->toDateString() . ' ' . $validated['preferred_time']
+        );
+
+        $endTime = $startTime->copy()->addMinutes($duration);
+
+        // 4. CEK TABRAKAN SLOT DENGAN BOOKING LAIN
+        $now = now();
+
+        $slotTaken = Booking::where('service_id', $service->id)
+            ->whereDate('booking_date', $bookingDate->toDateString())
+            ->where(function ($query) use ($startTime, $endTime) {
+                $query->where('start_time', '<', $endTime->format('H:i:s'))
+                      ->where('end_time', '>', $startTime->format('H:i:s'));
+            })
+            ->whereHas('bookingStatus', function ($q) {
+                $q->whereNotIn('name', ['Cancelled', 'Rejected']);
+            })
+            ->where(function ($q) use ($now) {
+                $q->where('payment_status', 'success') // sudah bayar → tetap blok slot
+                  ->orWhere(function ($q2) use ($now) {
+                      $q2->where('payment_status', 'pending')
+                         ->where('expires_at', '>', $now); // pending tapi belum kadaluarsa
+                  });
+            })
+            ->exists();
+
+        if ($slotTaken) {
+            throw new \Exception('Slot sudah diambil. Silakan pilih waktu lain.');
+        }
+
+        // 5. CEK STUDIO BUKA/TUTUP BERDASARKAN JADWAL MINGGUAN
+        $dayName = $bookingDate->format('l'); // "Monday", "Tuesday", ...
+        $studioSchedule = WeeklySchedule::where('day_of_week', $dayName)
+            ->where('is_available', true)
+            ->first();
+
+        if (!$studioSchedule) {
+            throw new \Exception('Studio tutup di hari yang dipilih.');
+        }
+
+        // 6. AMBIL STATUS "Pending Payment"
+        $pendingStatus = BookingStatus::where('name', 'Pending Payment')->first();
+        if (!$pendingStatus) {
+            throw new \Exception('BookingStatus "Pending Payment" tidak ditemukan!');
+        }
+
+        // 7. AMBIL HARGA DARI PIVOT (LEBIH AMAN DARIPADA PERCAYA INPUT USER)
+        $pivotPrice = DB::table('service_packages')
+            ->where('service_id', $service->id)
+            ->where('package_id', $package->id)
+            ->value('price');
+
+        if ($pivotPrice === null) {
+            throw new \Exception('Harga kombinasi service & package tidak ditemukan.');
+        }
+
+        $totalPrice    = (float) $pivotPrice;
+        $paymentOption = $validated['payment'];
+        $dpAmount      = $paymentOption === 'dp' ? $totalPrice * 0.5 : null;
+
+        // 8. SET WAKTU EXPIRE BOOKING
+        $expiresAt = now()->addMinutes(30);
+
+        // 9. SIMPAN BOOKING KE DATABASE
+        $booking = Booking::create([
+            'customer_name'       => $validated['full_name'],
+            'customer_email'      => $validated['email'],
+            'customer_phone'      => $validated['phone_number'],
+            'service_id'          => $service->id,
+            'package_id'          => $package->id,
+            'booking_status_id'   => $pendingStatus->id,
+            'booking_date'        => $bookingDate->toDateString(),
+            'start_time'          => $startTime->format('H:i:s'),
+            'end_time'            => $endTime->format('H:i:s'),
+            'total_price'         => $totalPrice,
+            'notes'               => $validated['notes'] ?? null,
+            'payment_option'      => $paymentOption,
+            'down_payment_amount' => $dpAmount,
+            'payment_status'      => 'pending',   // penting: konsisten sama job & getBookingStatus
+            'expires_at'          => $expiresAt,
         ]);
 
-        DB::beginTransaction();
+        // 10. KIRIM EMAIL KONFIRMASI
+        Mail::to($booking->customer_email)->send(new BookingSuccessMail($booking));
 
+        // 11. GENERATE SNAP TOKEN
+        $params = [
+            'transaction_details' => [
+                'order_id'      => $booking->booking_code,
+                'gross_amount'  => (int) $booking->total_price,
+            ],
+            'customer_details' => [
+                'first_name' => $booking->customer_name,
+                'email'      => $booking->customer_email,
+                'phone'      => $booking->customer_phone,
+            ],
+        ];
+
+        $snapToken = Snap::getSnapToken($params);
+
+        DB::commit();
+
+        // 12. DISPATCH JOB AUTO-CANCEL KALAU TIDAK BAYAR SAMPAI EXPIRED
         try {
-            // 2. AMBIL SERVICE & PACKAGE
-            $service = Service::findOrFail($validated['service']);
-            $package = Package::findOrFail($validated['package']);
-            $duration = (int) $package->duration_minutes;
-
-            // 3. HITUNG WAKTU MULAI & SELESAI
-            $bookingDate = Carbon::parse($validated['booking_date']);
-            $startTime = Carbon::createFromFormat(
-                'Y-m-d H:i',
-                $bookingDate->toDateString() . ' ' . $validated['preferred_time']
-            );
-            $endTime = $startTime->copy()->addMinutes($duration);
-
-            // 4. CEK TABRAKAN SLOT DENGAN BOOKING LAIN
-            $slotTaken = Booking::where('service_id', $service->id)
-                ->whereDate('booking_date', $bookingDate->toDateString())
-                ->where(function ($query) use ($startTime, $endTime) {
-                    $query->where('start_time', '<', $endTime->format('H:i:s'))
-                        ->where('end_time', '>', $startTime->format('H:i:s'));
-                })
-                ->whereHas('bookingStatus', function ($q) {
-                    $q->whereNotIn('name', ['Cancelled', 'Rejected']);
-                })
-                ->exists();
-
-            if ($slotTaken) {
-                throw new \Exception('Slot sudah diambil. Silakan pilih waktu lain.');
-            }
-
-            // 5. CEK STUDIO BUKA/TUTUP BERDASARKAN JADWAL MINGGUAN
-            // pake nama hari biar konsisten sama getAvailableSlots()
-            $dayName = $bookingDate->format('l'); // "Monday", "Tuesday", ...
-            $studioSchedule = WeeklySchedule::where('day_of_week', $dayName)
-                ->where('is_available', true)
-                ->first();
-
-            if (!$studioSchedule) {
-                throw new \Exception('Studio tutup di hari yang dipilih.');
-            }
-
-            // 6. AMBIL STATUS "Pending"
-            $pendingStatus = BookingStatus::where('name', 'Pending Payment')->first();
-            if (!$pendingStatus) {
-                throw new \Exception('BookingStatus "Pending" tidak ditemukan!');
-            }
-
-            // 7. AMBIL HARGA DARI PIVOT (LEBIH AMAN DARIPADA PERCAYA INPUT USER)
-            $pivotPrice = DB::table('service_packages')
-                ->where('service_id', $service->id)
-                ->where('package_id', $package->id)
-                ->value('price');
-
-            if ($pivotPrice === null) {
-                throw new \Exception('Harga kombinasi service & package tidak ditemukan.');
-            }
-
-            $totalPrice = (float) $pivotPrice;
-            $paymentOption = $validated['payment'];
-            $dpAmount = $paymentOption === 'dp' ? $totalPrice * 0.5 : null;
-
-            // 8. SIMPAN BOOKING KE DATABASE
-            $booking = Booking::create([
-                // kalau booking_code digenerate otomatis di model, bagian ini tidak perlu
-                // 'booking_code' => 'BOOK-' . strtoupper(Str::random(8)),
-                'customer_name' => $validated['full_name'],
-                'customer_email' => $validated['email'],
-                'customer_phone' => $validated['phone_number'],
-                'service_id' => $service->id,
-                'package_id' => $package->id,
-                'booking_status_id' => $pendingStatus->id,
-                'booking_date' => $bookingDate->toDateString(),
-                'start_time' => $startTime->format('H:i:s'),
-                'end_time' => $endTime->format('H:i:s'),
-                'total_price' => $totalPrice,
-                'notes' => $validated['notes'] ?? null,
-                'payment_option' => $paymentOption,
-                'down_payment_amount' => $dpAmount,
-                'payment_status' => 'pending',
-            ]);
-
-            // 9. KIRIM EMAIL KONFIRMASI (OPSIONAL, SUDAH ADA DI KODE LAMA)
-            Mail::to($booking->customer_email)->send(new BookingSuccessMail($booking));
-
-            // 10. GENERATE SNAP TOKEN
-            $params = [
-                'transaction_details' => [
-                    'order_id' => $booking->booking_code,
-                    'gross_amount' => (int) $booking->total_price, // Pastikan integer
-                ],
-                'customer_details' => [
-                    'first_name' => $booking->customer_name,
-                    'email' => $booking->customer_email,
-                    'phone' => $booking->customer_phone,
-                ],
-            ];
-
-            $snapToken = Snap::getSnapToken($params);
-
-            DB::commit();
-
-            $redirectUrl = route('booking.success', ['booking' => $booking]);
-
-            // 11. RESPONSE UNTUK AJAX / JSON
-            if ($request->ajax() || $request->wantsJson()) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Booking sukses! Kode booking kamu: ' . $booking->booking_code,
-                    'snap_token' => $snapToken,
-                    'redirect_url' => $redirectUrl,
-                    'data' => [
-                        'booking_id' => $booking->id,
-                        'booking_code' => $booking->booking_code,
-                    ],
-                ], 201);
-            }
-            // 12. RESPONSE UNTUK FORM BIASA (NON AJAX)
-            return redirect()->route('booking.success', $booking)
-                ->with('success', 'Booking berhasil dibuat, silakan lanjut pembayaran.');
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            // logging biar gampang debug
-            Log::error("Booking gagal: " . $e->getMessage());
-            Log::error($e->getTraceAsString());
-
-            if ($request->ajax() || $request->wantsJson()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Terjadi error saat booking: ' . $e->getMessage(),
-                    'errors' => ['error' => $e->getMessage()],
-                ], 500);
-            }
-
-            return back()
-                ->withErrors(['error' => 'Terjadi error saat booking: ' . $e->getMessage()])
-                ->withInput();
+            ReleaseBookingIfUnpaid::dispatch($booking->id)->delay($expiresAt);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to dispatch ReleaseBookingIfUnpaid job: ' . $e->getMessage());
         }
+
+        $redirectUrl = route('booking.success', ['booking' => $booking]);
+
+        // 13. RESPONSE UNTUK AJAX / JSON
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success'      => true,
+                'message'      => 'Booking sukses! Kode booking kamu: ' . $booking->booking_code,
+                'snap_token'   => $snapToken,
+                'redirect_url' => $redirectUrl,
+                'data'         => [
+                    'booking_id'   => $booking->id,
+                    'booking_code' => $booking->booking_code,
+                ],
+            ], 201);
+        }
+
+        // 14. RESPONSE UNTUK FORM BIASA (NON AJAX)
+        return redirect()->route('booking.success', $booking)
+            ->with('success', 'Booking berhasil dibuat, silakan lanjut pembayaran.');
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+
+        Log::error("Booking gagal: " . $e->getMessage());
+        Log::error($e->getTraceAsString());
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi error saat booking: ' . $e->getMessage(),
+                'errors'  => ['error' => $e->getMessage()],
+            ], 500);
+        }
+
+        return back()
+            ->withErrors(['error' => 'Terjadi error saat booking: ' . $e->getMessage()])
+            ->withInput();
     }
+}
+
 
     /**
      * Halaman sukses booking
      */
     public function success(Booking $booking)
     {
+            // 1. Auto-expire kalau sudah lewat batas tapi masih pending
+        if ($booking->payment_status === 'pending'
+            && $booking->expires_at
+            && $booking->expires_at->lte(now())) {
+
+            $cancelStatus = BookingStatus::where('name', 'Cancelled')->first();
+
+            if ($cancelStatus) {
+                $booking->booking_status_id = $cancelStatus->id;
+                $booking->payment_status = 'failed';
+                $booking->save();
+            }
+        }
+
         // Load relasi yang dibutuhkan
         $booking->load(['service', 'package', 'bookingStatus']);
 
@@ -391,7 +436,15 @@ class BookingController extends Controller
             $paymentState = 'pending';
         }
 
-        return view('pages.success', compact('booking', 'bookingData', 'paymentState'));
+        // Determine if booking was expired (cancelled due to expiry)
+        $isExpired = false;
+        if (($statusName === 'Cancelled' || $statusName === 'Rejected') && $booking->expires_at) {
+            if ($booking->expires_at->lte(now())) {
+                $isExpired = true;
+            }
+        }
+
+        return view('pages.success', compact('booking', 'bookingData', 'paymentState', 'isExpired'));
     }
 
     /**
@@ -447,6 +500,19 @@ class BookingController extends Controller
         try {
             $booking->load(['bookingStatus']);
 
+            // If booking is still pending but already expired, mark it cancelled/failed immediately.
+            if ($booking->payment_status === 'pending' && $booking->expires_at && $booking->expires_at->lte(now())) {
+                $cancelStatus = BookingStatus::where('name', 'Cancelled')->first();
+                if ($cancelStatus) {
+                    $booking->booking_status_id = $cancelStatus->id;
+                    $booking->payment_status = 'failed';
+                    $booking->save();
+                    // reload relation
+                    $booking->load(['bookingStatus']);
+                    Log::info('getBookingStatus: Booking auto-cancelled due to expiry', ['booking_id' => $booking->id]);
+                }
+            }
+
             // Tentukan payment state
             $paymentState = 'pending';
             $statusName = $booking->bookingStatus?->name ?? '';
@@ -474,3 +540,4 @@ class BookingController extends Controller
     }
 
 }
+

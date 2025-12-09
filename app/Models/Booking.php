@@ -4,6 +4,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * @property int $id
@@ -49,6 +50,7 @@ class Booking extends Model
         'payment_option',
         'down_payment_amount',
         'payment_status',
+        'expires_at',
     ];
 
 
@@ -58,6 +60,7 @@ class Booking extends Model
         'end_time' => 'datetime:H:i:s',
         'down_payment_amount' => 'float',
         'total_price' => 'float',
+        'expires_at' => 'datetime',
     ];
 
 
@@ -95,5 +98,22 @@ class Booking extends Model
         }
     });
 }
+
+    public function scopeNotExpired(Builder $query): Builder
+    {
+        $now = now();
+
+        return $query->where(function ($q) use ($now) {
+            $q->where('payment_status', '!=', 'pending') // semua yang bukan pending
+              ->orWhere(function ($q2) use ($now) {
+                  $q2->where('payment_status', 'pending')
+                     ->where(function ($q3) use ($now) {
+                         $q3->whereNull('expires_at')        // data lama
+                             ->orWhere('expires_at', '>', $now); // pending tapi BELUM expired
+                     });
+              });
+        });
+    }
+
 
 }

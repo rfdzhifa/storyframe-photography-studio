@@ -65,12 +65,21 @@ class PaymentController extends Controller
     }
 
     private function updateStatus(Booking $booking, $statusName)
-    {
-        $status = BookingStatus::where('name', $statusName)->first();
-        if ($status) {
-            $booking->booking_status_id = $status->id;
-            $booking->payment_status = strtolower(str_replace(' ', '_', $statusName)); // e.g., paid_full
-            $booking->save();
+{
+    $status = BookingStatus::where('name', $statusName)->first();
+    if ($status) {
+        $booking->booking_status_id = $status->id;
+
+        if ($statusName === 'Pending Payment') {
+            $booking->payment_status = 'pending';
+        } elseif (str_contains($statusName, 'Paid')) {
+            $booking->payment_status = 'success';
+        } elseif ($statusName === 'Cancelled' || $statusName === 'Rejected') {
+            $booking->payment_status = 'failed';
         }
+
+        $booking->save();
     }
+}
+
 }
