@@ -5,67 +5,36 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Package extends Model
 {
     use HasFactory;
 
-    /**
-     * @property int $id
-     * @property string $name
-     * @property string|null $description
-     * @property int $duration_minutes
-     * @property int $max_photos
-     * @property bool $includes_editing
-     * @property bool $is_active
-     * @property \Illuminate\Support\Carbon|null $created_at
-     * @property \Illuminate\Support\Carbon|null $updated_at
-     *
-     * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Service[] $services
-     * @property-read \Illuminate\Database\Eloquent\Collection|\App\Models\Booking[] $bookings
-     */
-
-    /**
-     * @var array<int, string>
-     */
     protected $fillable = [
         'name',
-        'description',
-        'duration_minutes',
-        'max_photos',
-        'includes_editing',
         'is_active',
     ];
 
-    /**
-     * @var array<string, string>
-     */
     protected $casts = [
-        'duration_minutes' => 'integer',
-        'max_photos' => 'integer',
-        'includes_editing' => 'boolean',
         'is_active' => 'boolean',
     ];
 
-    /**
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
-     */
     public function services(): BelongsToMany
     {
-        return $this->belongsToMany(Service::class, 'service_packages')
-                    ->using(ServicePackage::class)
-                    ->withPivot('price', 'is_active')
-                    ->withTimestamps();
-    }
-
-    /**
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
-     */
-    public function bookings(): HasMany
-    {
-        return $this->hasMany(Booking::class);
+        return $this->belongsToMany(
+                Service::class,
+                'service_packages',
+                'package_id',
+                'service_id'
+            )
+            ->using(ServicePackage::class)
+            ->withPivot([
+                'id',
+                'price',
+                'description',
+                'duration_minutes',
+                'is_active',
+            ])
+            ->withTimestamps();
     }
 }

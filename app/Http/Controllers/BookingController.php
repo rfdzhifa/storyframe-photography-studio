@@ -52,84 +52,80 @@ class BookingController extends Controller
      */
 
     public function getAvailableSlots(Request $request)
-    {
-        $request->validate([
-            'date' => 'required|date',
-            'package' => 'required|exists:packages,id',
-        ]);
+{
+    $request->validate([
+        'date' => 'required|date',
+        'service' => 'required|exists:services,id',
+        'package' => 'required|exists:packages,id',
+    ]);
 
-        $date = Carbon::parse($request->input('date'));
-        $dayName = $date->format('l'); // Contoh: "Monday"
-        $packageId = $request->input('package');
+    $date = Carbon::parse($request->input('date'));
+    $dayName = $date->format('l'); // "Monday", dst.
+    $serviceId = (int) $request->input('service');
+    $packageId = (int) $request->input('package');
 
-        // Ambil durasi dari package
-        $package = Package::findOrFail($packageId);
-        $duration = $package->duration_minutes;
+    // Ambil pivot (service_packages) yang sesuai untuk dapat duration_minutes
+    $servicePackage = ServicePackage::where('service_id', $serviceId)
+        ->where('package_id', $packageId)
+        ->where('is_active', true)
+        ->first();
 
-        // Ambil jadwal berdasarkan nama hari
-        $weeklySchedule = WeeklySchedule::where('day_of_week', $dayName)
-            ->where('is_available', true)
-            ->first();
-
-        if (!$weeklySchedule) {
-            return response()->json(['error' => 'Studio not available on this day.'], 404);
-        }
-
-        // Generate slot dengan tanggal spesifik dari user + jam dari jadwal mingguan
-        $allSlots = $weeklySchedule->generateSlots($date->toDateString(), $duration);
-
-        $serviceId = ServicePackage::where('package_id', $package->id)
-            ->where('is_active', true)
-            ->value('service_id');
-
-        $now = now();
-
-        // Consider bookings for the same service + package that are not cancelled.
-        // Pending bookings should reserve the slot until they are released/cancelled.
-        // Only consider bookings that are not expired (paid OR pending but not yet expired)
-        $bookedSlots = Booking::whereDate('booking_date', $date->toDateString())
-            ->where('service_id', $serviceId)
-            ->where('package_id', $packageId)
-            ->whereHas('bookingStatus', function ($q) {
-                $q->whereNotIn('name', ['Cancelled', 'Rejected']);
-            })
-            ->notExpired() // scope on Booking model: excludes pending-but-expired bookings
-            ->get();
-
-        // Ambil array dari waktu mulai booking
-        $bookedTimes = [];
-        foreach ($bookedSlots as $booking) {
-            $start = Carbon::parse($booking->start_time)->format('H:i');
-            $end = Carbon::parse($booking->end_time)->format('H:i');
-
-            $bookedTimes[] = [
-                'start' => $start,
-                'end' => $end,
-            ];
-        }
-
-        // Filter slot yang bentrok
-        $availableSlots = collect($allSlots)->filter(function ($slot) use ($bookedTimes) {
-            $slotStart = Carbon::createFromFormat('H:i', $slot['start']);
-            $slotEnd = Carbon::createFromFormat('H:i', $slot['end']);
-
-            foreach ($bookedTimes as $booked) {
-                $bookedStart = Carbon::createFromFormat('H:i', $booked['start']);
-                $bookedEnd = Carbon::createFromFormat('H:i', $booked['end']);
-
-                if (
-                    ($slotStart >= $bookedStart && $slotStart < $bookedEnd) ||
-                    ($slotEnd > $bookedStart && $slotEnd <= $bookedEnd) ||
-                    ($slotStart <= $bookedStart && $slotEnd >= $bookedEnd)
-                ) {
-                    return false;
-                }
-            }
-            return true;
-        })->values();
-
-        return response()->json($availableSlots);
+    if (!$servicePackage) {
+        return response()->json([
+            'error' => 'Selected service + package is not available.'
+        ], 404);
     }
+
+    $duration = (int) $servicePackage->duration_minutes;
+
+    // Ambil jadwal berdasarkan nama hari
+    $weeklySchedule = WeeklySchedule::where('day_of_week', $dayName)
+        ->where('is_available', true)
+        ->first();
+
+    if (!$weeklySchedule) {
+        return response()->json(['error' => 'Studio not available on this day.'], 404);
+    }
+
+    // Generate slot berdasarkan durasi dari pivot
+    $allSlots = $weeklySchedule->generateSlots($date->toDateString(), $duration);
+
+    // Ambil booking yang bentrok (service + package) dan tidak dibatalkan/ditolak
+    $bookedSlots = Booking::whereDate('booking_date', $date->toDateString())
+        ->where('service_id', $serviceId)
+        ->where('package_id', $packageId)
+        ->whereHas('bookingStatus', function ($q) {
+            $q->whereNotIn('name', ['Cancelled', 'Rejected']);
+        })
+        ->notExpired()
+        ->get();
+
+    $bookedTimes = $bookedSlots->map(function ($booking) {
+        return [
+            'start' => Carbon::parse($booking->start_time)->format('H:i'),
+            'end'   => Carbon::parse($booking->end_time)->format('H:i'),
+        ];
+    })->all();
+
+    // Filter slot yang bentrok
+    $availableSlots = collect($allSlots)->filter(function ($slot) use ($bookedTimes) {
+    $slotStart = Carbon::createFromFormat('H:i', $slot['start']);
+    $slotEnd   = Carbon::createFromFormat('H:i', $slot['end']);
+
+        foreach ($bookedTimes as $booked) {
+            $bookedStart = Carbon::createFromFormat('H:i', $booked['start']);
+            $bookedEnd   = Carbon::createFromFormat('H:i', $booked['end']);
+
+            $overlap =
+                ($slotStart < $bookedEnd) && ($slotEnd > $bookedStart);
+
+            if ($overlap) return false;
+        }
+        return true;
+    })->values();
+
+    return response()->json($availableSlots);
+}
 
     public function checkout(Request $request)
     {
