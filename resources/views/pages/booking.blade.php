@@ -2,6 +2,8 @@
 
 @extends('app')
 
+@vite('resources/js/components/booking.js')
+
 @section('title', content: 'Booking')
 
 @section('content')
@@ -72,7 +74,8 @@
 
     <!-- Step 2: Service & Package -->
     <section id="step2"
-    class="full-page-section w-full min-h-screen py-16 bg-zinc-100 flex flex-col justify-between items-center px-4 md:px-40 hidden">
+    class="full-page-section w-full min-h-screen py-16 bg-zinc-100 flex flex-col justify-between items-center px-4 md:px-40"
+    style="display: none;">
 
     <div class="w-full">
       <h2 class="text-center text-gray-900 text-2xl md:text-4xl font-medium mb-8">
@@ -174,7 +177,8 @@
 
     <!-- Step 3: Date & Notes -->
     <section id="step3"
-    class="full-page-section w-full min-h-screen py-16 bg-zinc-100 flex flex-col justify-between items-center px-4 md:px-40 hidden">
+    class="full-page-section w-full min-h-screen py-16 bg-zinc-100 flex flex-col justify-between items-center px-4 md:px-40"
+    style="display: none;">
 
     <div class="w-full">
       <h2 class="text-center text-gray-900 text-2xl md:text-4xl font-medium mb-8">

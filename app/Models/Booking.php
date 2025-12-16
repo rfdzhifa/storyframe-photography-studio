@@ -23,6 +23,8 @@ use Illuminate\Database\Eloquent\Builder;
  * @property string $payment_option
  * @property float|null $down_payment_amount
  * @property string $payment_status
+ * @property \Illuminate\Support\Carbon|null $expires_at
+ * @property string|null $snap_token
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  *
@@ -51,6 +53,7 @@ class Booking extends Model
         'down_payment_amount',
         'payment_status',
         'expires_at',
+        'snap_token',
     ];
 
 
@@ -61,6 +64,7 @@ class Booking extends Model
         'down_payment_amount' => 'float',
         'total_price' => 'float',
         'expires_at' => 'datetime',
+        'snap_token' => 'string',
     ];
 
 

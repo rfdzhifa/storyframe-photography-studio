@@ -6,6 +6,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property int $id
+ * @property string $name
+ * @property string|null $color_indicator
+ * @property \Illuminate\Support\Carbon $created_at
+ * @property \Illuminate\Support\Carbon $updated_at
+ */
 class BookingStatus extends Model
 {
     use HasFactory;
@@ -14,14 +21,6 @@ class BookingStatus extends Model
      * @var string
      */
     protected $table = 'booking_status';
-
-    /**
-     * @property int $id
-     * @property string $name
-     * @property string|null $color_indicator
-     * @property \Illuminate\Support\Carbon $created_at
-     * @property \Illuminate\Support\Carbon $updated_at
-     */
 
     /**
      * @var array<int, string>

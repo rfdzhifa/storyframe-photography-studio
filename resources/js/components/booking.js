@@ -1,4 +1,7 @@
 export function initBookingSlide() {
+    const isBookingPage = document.getElementById('step1') || document.getElementById('service');
+if (!isBookingPage) return;
+
     if (window.bookingSlideInitialized) {
         console.log('[Booking Init] Skipping init, already initialized.');
         return;
