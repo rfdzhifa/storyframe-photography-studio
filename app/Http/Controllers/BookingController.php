@@ -533,5 +533,18 @@ if ($expiresAt <= now()) {
         }
     }
 
+    public function serviceThumb(Service $service)
+{
+    if (!$service->thumb_data || !$service->thumb_mime) {
+        abort(404);
+    }
+
+    $bytes = $service->thumb_data;
+
+    return response($bytes)
+        ->header('Content-Type', $service->thumb_mime)
+        ->header('Cache-Control', 'public, max-age=86400');
+}
+
 }
 
