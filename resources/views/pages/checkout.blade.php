@@ -507,12 +507,12 @@
           if (data.success && data.snap_token) {
             // Trigger Midtrans Snap
             snap.pay(data.snap_token, {
-              onSuccess: function(result) {
-                window.location.href = data.redirect_url || '/success';
+              onSuccess: function() {
+                window.location.href = data.redirect_url;
               },
               onPending: function(result) {
                 alert('Menunggu pembayaran. Silakan selesaikan pembayaran Anda.');
-                window.location.href = data.redirect_url || '/success';
+                window.location.href = data.redirect_url;
               },
               onError: function(result) {
                 alert('Pembayaran gagal. Silakan coba lagi.');

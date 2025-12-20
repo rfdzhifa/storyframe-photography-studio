@@ -284,11 +284,11 @@
             <!-- Action Buttons -->
             <div class="flex flex-col sm:flex-row justify-center gap-4">
                 @if($paymentState === 'pending')
-                    <button id="continue-payment-btn" onclick="continuePayment()"
+                    <a href="{{ route('booking.pay', $booking) }}"
                         class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-8 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center">
                         <i class="fas fa-credit-card mr-2"></i>
                         Lanjutkan Pembayaran
-                    </button>
+                    </a>
                 @endif
                 <a href="{{ url('/') }}"
                     class="bg-gray-500 hover:bg-gray-600 text-white font-medium py-3 px-8 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center">
@@ -338,7 +338,7 @@
 
             // Cek status setiap 10 detik
             statusCheckInterval = setInterval(async function() {
-                const response = await fetch(`/api/booking/${bookingId}/status`, ...);
+                const response = await fetch(`/booking/${bookingId}/status`);
                     if (response.ok) {
                         const data = await response.json();
                         if (data.success) {
@@ -408,7 +408,7 @@
         async function refreshBookingStatus() {
             try {
                 const bookingId = '{{ $booking->id }}';
-                const response = await fetch(`/api/booking/${bookingId}/status`, {
+                const response = await fetch(`/booking/${bookingId}/status`), {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',

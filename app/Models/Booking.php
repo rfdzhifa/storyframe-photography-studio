@@ -51,6 +51,8 @@ class Booking extends Model
         'down_payment_amount',
         'payment_status',
         'expires_at',
+        'snap_token',
+        'midtrans_order_id',
     ];
 
 

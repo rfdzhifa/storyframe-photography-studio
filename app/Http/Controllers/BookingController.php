@@ -186,7 +186,22 @@ public function store(Request $request)
         // 2. AMBIL SERVICE & PACKAGE
         $service  = Service::findOrFail($validated['service']);
         $package  = Package::findOrFail($validated['package']);
-        $duration = (int) $package->duration_minutes;
+
+        // 2.a AMBIL DURASI DARI PIVOT service_packages (WAJIB)
+        $servicePackage = ServicePackage::where('service_id', $service->id)
+            ->where('package_id', $package->id)
+            ->where('is_active', true)
+            ->first();
+
+        if (!$servicePackage) {
+            throw new \Exception('Durasi service & package tidak ditemukan.');
+        }
+
+        $duration = (int) $servicePackage->duration_minutes;
+
+        if ($duration <= 0) {
+            throw new \Exception('Durasi paket tidak valid.');
+        }
 
         // 3. HITUNG WAKTU MULAI & SELESAI
         $bookingDate = Carbon::parse($validated['booking_date']);
@@ -279,6 +294,8 @@ public function store(Request $request)
         Mail::to($booking->customer_email)->send(new BookingSuccessMail($booking));
 
         // 11. GENERATE SNAP TOKEN
+        $chargeAmount = (int) ($booking->payment_option === 'dp' ? ($booking->down_payment_amount ?? ($booking->total_price*0.5)) : $booking->total_price);
+
         $params = [
             'transaction_details' => [
                 'order_id'      => $booking->booking_code,
@@ -289,9 +306,23 @@ public function store(Request $request)
                 'email'      => $booking->customer_email,
                 'phone'      => $booking->customer_phone,
             ],
+            'item_details' => [
+                [
+                    'id'       => 'booking-' . $booking->id,
+                    'price'    => $chargeAmount,
+                    'quantity' => 1,
+                    'name'     => $booking->service->name . ' - ' . $booking->package->name
+                ]
+            ],
+            'callbacks' => [
+                'finish' => route('booking.success', $booking),
+            ],
         ];
 
         $snapToken = Snap::getSnapToken($params);
+
+        $booking->snap_token = $snapToken;
+        $booking->save();
 
         DB::commit();
 
@@ -365,10 +396,15 @@ public function store(Request $request)
         // Load relasi yang dibutuhkan
         $booking->load(['service', 'package', 'bookingStatus']);
 
-        // Generate Snap Token jika status masih pending
-        $snapToken = null;
-        if ($booking->bookingStatus?->name == 'Pending Payment') {
+        // Snap token dari DB (dibuat saat store)
+        $snapToken = $booking->snap_token;
+
+        // Kalau belum ada snap token dan masih pending, generate di sini
+        if ($booking->bookingStatus?->name == 'Pending Payment' && !$snapToken) {
             try {
+
+                $chargeAmount = (int) ($booking->payment_option === 'dp' ? ($booking->down_payment_amount ?? ($booking->total_price*0.5)) : $booking->total_price);
+
                 $params = [
                     'transaction_details' => [
                         'order_id' => $booking->booking_code,
@@ -387,8 +423,15 @@ public function store(Request $request)
                             'name' => $booking->service->name . ' - ' . $booking->package->name
                         ]
                     ],
+                    'callbacks' => [
+                        'finish' => route('booking.success', $booking),
+                    ],
                 ];
+
                 $snapToken = Snap::getSnapToken($params);
+                $booking->snap_token = $snapToken;
+                $booking->save();
+
                 Log::info('Snap token generated on page load', [
                     'booking_id' => $booking->id,
                     'token' => substr($snapToken, 0, 20) . '...'
@@ -471,17 +514,30 @@ public function store(Request $request)
     public function catalog()
     {
         $services = Service::where('is_active', true)
+        ->select('id', 'name', 'description', 'is_active')
             ->with('packages') // penting: eager load + wherePivot di relasi
             ->orderBy('name')
             ->get();
 
         return view('pages.catalog', compact('services'));
     }
+
+    public function serviceThumb(Service $service)
+{
+    // kalau tidak ada blob-nya, arahkan ke fallback
+    if (!$service->thumb_data) {
+        return redirect('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1200&auto=format&fit=crop');
+    }
+
+    return response($service->thumb_data, 200)
+        ->header('Content-Type', $service->thumb_mime ?? 'image/jpeg')
+        ->header('Cache-Control', 'public, max-age=604800'); // 7 hari
+}
     public function detail(Service $service)
     {
         $service->load([
             'packages' => function ($q) {
-                $q->withPivot(['price'])->orderBy('packages.name');
+                $q->withPivot(['price', 'description'])->orderBy('packages.name');
             }
         ]);
 
@@ -534,6 +590,64 @@ public function store(Request $request)
             ], 500);
         }
     }
+
+    public function pay(Booking $booking)
+{
+    $booking->load(['service', 'package', 'bookingStatus']);
+
+    if ($booking->payment_status !== 'pending') {
+        return redirect()->route('booking.success', $booking)
+            ->with('info', 'Booking ini sudah tidak dalam status pending.');
+    }
+
+    if ($booking->expires_at && $booking->expires_at->lte(now())) {
+        return redirect()->route('booking.success', $booking)
+            ->with('error', 'Booking sudah kedaluwarsa. Silakan buat booking baru.');
+    }
+
+    // ✅ ambil dari DB dulu (anti order_id already taken)
+    $snapToken = $booking->snap_token;
+
+    // kalau booking lama belum punya token, generate sekali lalu simpan
+    if (!$snapToken) {
+        $chargeAmount = (int) ($booking->payment_option === 'dp'
+            ? ($booking->down_payment_amount ?? ($booking->total_price * 0.5))
+            : $booking->total_price);
+
+        $params = [
+            'transaction_details' => [
+                'order_id'     => $booking->booking_code,
+                'gross_amount' => $chargeAmount,
+            ],
+            'customer_details' => [
+                'first_name' => $booking->customer_name,
+                'email'      => $booking->customer_email,
+                'phone'      => $booking->customer_phone,
+            ],
+            'item_details' => [
+                [
+                    'id'       => 'booking-' . $booking->id,
+                    'price'    => $chargeAmount,
+                    'quantity' => 1,
+                    'name'     => ($booking->service?->name ?? 'Service') . ' - ' . ($booking->package?->name ?? 'Package'),
+                ]
+            ],
+            'callbacks' => [
+                'finish' => route('booking.success', $booking),
+            ],
+        ];
+
+        $snapToken = Snap::getSnapToken($params);
+
+        $booking->snap_token = $snapToken;
+        $booking->save();
+    }
+
+    return view('pages.pay', [
+        'booking'   => $booking,
+        'snapToken' => $snapToken,
+    ]);
+}
 
 }
 

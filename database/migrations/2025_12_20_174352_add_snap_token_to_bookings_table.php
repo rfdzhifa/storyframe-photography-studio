@@ -12,8 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('bookings', function (Blueprint $table) {
-            $table->timestamp('expires_at')->nullable()->after('payment_status');
-            $table->index('expires_at');
+            $table->string('snap_token', 255)->nullable()->after('expires_at');
+            $table->string('midtrans_order_id', 100)->nullable()->after('snap_token');
+            $table->index('snap_token');
         });
     }
 
@@ -23,8 +24,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('bookings', function (Blueprint $table) {
-            $table->dropIndex(['expires_at']);
-            $table->dropColumn('expires_at');
+            $table->dropIndex(['snap_token']);
+            $table->dropColumn('snap_token');
         });
     }
 };

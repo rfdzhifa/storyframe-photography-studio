@@ -3,7 +3,11 @@
 @section('title', $service->name . ' - Detail Paket')
 
 @section('content')
-<section class="w-full bg-zinc-100 min-h-[60vh] flex flex-col justify-center py-20 md:py-28 px-4 md:px-8 lg:px-40">
+@php
+  $fallback = 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1200&auto=format&fit=crop';
+@endphp
+
+<section class="w-full bg-zinc-100 min-h-[60vh] py-20 md:py-28 px-4 md:px-8 lg:px-40">
   <div class="w-full max-w-6xl mx-auto">
 
     <a href="{{ route('booking.catalog') }}"
@@ -11,70 +15,127 @@
       ← Kembali ke Catalog
     </a>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-10 items-start mb-10">
-      <img src="{{ $service->thumbnail ?? 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1200&auto=format&fit=crop' }}"
-           class="rounded-2xl shadow-md object-cover w-full h-80 md:h-[450px]"
-           alt="{{ $service->name }}" />
+    {{-- CARD BESAR: FOTO + KONTEN DALAM 1 KOTAK --}}
+    <div class="bg-white rounded-[24px] shadow-md overflow-hidden">
+      <div class="grid grid-cols-1 md:grid-cols-2">
 
-      <div class="flex flex-col gap-5">
-        <h1 class="text-3xl md:text-5xl font-semibold text-gray-900">{{ $service->name }}</h1>
-        <p class="text-gray-600 text-sm md:text-base leading-relaxed">
-          {{ $service->description ?? 'Nikmati pengalaman fotografi profesional dengan hasil terbaik untuk setiap momen Anda.' }}
-        </p>
+        {{-- FOTO --}}
+        <div class="group overflow-hidden bg-zinc-200">
+          <img
+            src="{{ route('booking.services.thumb', $service->id) }}"
+            onerror="this.onerror=null; this.src='{{ $fallback }}';"
+            alt="{{ $service->name }}"
+            class="w-full h-72 md:h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        </div>
 
-        <!-- Pilih Paket -->
-<div class="mt-1">
-  <h2 class="text-sm md:text-base font-semibold text-gray-900 mb-2">Pilih Paket</h2>
+        {{-- KONTEN --}}
+        <div class="p-6 md:p-8 flex flex-col gap-6">
 
-<div id="packageGrid" class="grid grid-cols-3 gap-3">
-  @foreach ($service->packages as $pkg)
-    <button type="button"
-      class="pkg-option flex justify-center items-center px-4 py-2 rounded-xl border border-gray-300 hover:border-blue-500 transition bg-white text-sm font-medium"
-      data-id="{{ $pkg->id }}"                     {{-- <<< WAJIB --}}
-      data-name="{{ $pkg->name }}"                 {{-- <<< WAJIB --}}
-      data-price="{{ $pkg->pivot->price }}">       {{-- <<< WAJIB --}}
-      {{ $pkg->name }}
-    </button>
-  @endforeach
-</div>
+          {{-- JUDUL SERVICE --}}
+          <div class="flex flex-col gap-2">
+            <h1 class="text-3xl md:text-5xl font-semibold text-gray-900">
+              {{ $service->name }}
+            </h1>
+            <p class="text-gray-600 text-sm md:text-base leading-relaxed">
+              {{ $service->description ?? 'Nikmati pengalaman fotografi profesional dengan hasil terbaik.' }}
+            </p>
+          </div>
 
-  {{-- ===== TANGGAL & JAM (berdampingan) ===== --}}
-<div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-  <div>
-    <label class="block text-sm md:text-base font-semibold text-gray-900 mb-2">Pilih Tanggal</label>
-    <input
-      type="date"
-      id="bookingDate"
-      class="w-full px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-300"
-      min="{{ now()->toDateString() }}"
-      max="{{ now()->addDays(30)->toDateString() }}"
-    />
-    <p id="dateHint" class="mt-2 text-xs text-gray-500">Pilih tanggal setelah memilih paket.</p>
+          {{-- DETAIL PAKET --}}
+          <div class="flex flex-col gap-2">
+            <h2 class="text-sm md:text-base font-semibold text-gray-900">
+              Detail Paket
+            </h2>
+
+            <p id="pkgDescHint" class="text-xs text-gray-500">
+              Pilih paket untuk melihat detailnya.
+            </p>
+
+            <div id="pkgDescWrap" class="hidden">
+              <div class="rounded-xl bg-zinc-50 border border-zinc-200 p-3">
+                <p id="pkgDesc" class="text-sm text-gray-700 leading-relaxed"></p>
+              </div>
+            </div>
+          </div>
+
+          {{-- PILIH PAKET --}}
+          <div>
+            <h2 class="text-sm md:text-base font-semibold text-gray-900 mb-2">
+              Pilih Paket
+            </h2>
+
+            <div id="packageGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              @foreach ($service->packages as $pkg)
+                <button
+                  type="button"
+                  class="pkg-option px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm font-medium hover:border-blue-500 transition"
+                  data-id="{{ $pkg->id }}"
+                  data-name="{{ $pkg->name }}"
+                  data-price="{{ $pkg->pivot->price }}"
+                  data-description="{{ e($pkg->pivot->description ?? '') }}"
+                >
+                  {{ $pkg->name }}
+                </button>
+              @endforeach
+            </div>
+          </div>
+
+          {{-- TANGGAL & JAM --}}
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-semibold text-gray-900 mb-2">
+                Pilih Tanggal
+              </label>
+              <input
+                type="date"
+                id="bookingDate"
+                class="w-full px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-300"
+                min="{{ now()->toDateString() }}"
+                max="{{ now()->addDays(30)->toDateString() }}"
+              />
+              <p class="mt-2 text-xs text-gray-500">Pilih tanggal setelah memilih paket.</p>
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold text-gray-900 mb-2">
+                Pilih Jam
+              </label>
+              <select
+                id="bookingTimeSelect"
+                class="w-full px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-300"
+                disabled
+              >
+                <option value="">Pilih tanggal dulu…</option>
+              </select>
+              <p id="slotHint" class="mt-2 text-xs text-gray-500">
+                Slot akan muncul setelah pilih paket & tanggal.
+              </p>
+            </div>
+          </div>
+
+          {{-- CTA --}}
+          <button
+            id="btnBook"
+            type="button"
+            class="w-full px-4 py-3 rounded-xl bg-blue-600 text-white font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Lanjut Booking
+          </button>
+
+          {{-- HIDDEN --}}
+          <input type="hidden" id="inputServiceId" value="{{ $service->id }}">
+          <input type="hidden" id="inputPackageId">
+          <input type="hidden" id="inputPackagePrice">
+          <input type="hidden" id="inputStartTime">
+
+        </div>
+      </div>
+    </div>
+
   </div>
-
-  <div>
-    <label class="block text-sm md:text-base font-semibold text-gray-900 mb-2">Pilih Jam</label>
-    <select
-      id="bookingTimeSelect"
-      class="w-full px-4 py-2 rounded-xl border border-gray-300 bg-white text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-300"
-      disabled
-    >
-      <option value="">Pilih tanggal dulu…</option>
-    </select>
-    <p id="slotHint" class="mt-2 text-xs text-gray-500">Slot akan muncul setelah pilih paket & tanggal.</p>
-  </div>
-</div>
-
-<button id="btnBook" type ="submit"
-          class="mt-4 w-full px-4 py-2 rounded-xl bg-blue-600 text-white font-semibold disabled:opacity-40 disabled:cursor-not-allowed">
-    Lanjut Booking
-  </button>
-
-{{-- hidden untuk redirect ke form booking --}}
-<input type="hidden" id="inputServiceId" value="{{ $service->id }}">
-<input type="hidden" id="inputPackageId">
-<input type="hidden" id="inputPackagePrice">
-<input type="hidden" id="inputStartTime">
+</section>
+@endsection
 
 @push('scripts')
 <script>
@@ -82,23 +143,14 @@
   // ===== Utils =====
   const $ = (sel, ctx = document) => ctx.querySelector(sel);
   const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
-  const fmtRp = n => 'Rp ' + new Intl.NumberFormat('id-ID').format(Number(n || 0));
-  const fmtDate = v => !v ? '—' : new Date(v + 'T00:00:00').toLocaleDateString(
-    'id-ID',{ weekday:'long', day:'2-digit', month:'long', year:'numeric' }
-  );
   const csrf = () => document.querySelector('meta[name="csrf-token"]')?.content || '';
 
-  // ===== Elements (null-safe) =====
+  // ===== Elements =====
   const els = {
     pkgBtns: $$('.pkg-option'),
-    info:    $('#pkgInfo'),
-    nameEl:  $('#pkgName'),
-    priceEl: $('#pkgPrice'),
-
-    sumName:  $('#summaryName'),
-    sumPrice: $('#summaryPrice'),
-    sumDate:  $('#summaryDate'),
-    sumTime:  $('#summaryTime'),
+    pkgDesc: $('#pkgDesc'),
+    pkgDescWrap: $('#pkgDescWrap'),
+    pkgDescHint: $('#pkgDescHint'),
 
     inputSvc:   $('#inputServiceId'),
     inputPkg:   $('#inputPackageId'),
@@ -106,15 +158,13 @@
     inputTime:  $('#inputStartTime'),
 
     dateEl:  $('#bookingDate'),
-    timeSel: $('#bookingTimeSelect'),    // << DIUBAH: dropdown jam
+    timeSel: $('#bookingTimeSelect'),
     slotHint: $('#slotHint'),
     btnBook: $('#btnBook'),
   };
 
-  // guard minimal
   if (!els.inputSvc || !els.btnBook) return;
 
-  // ===== State =====
   let slotsAbort = null;
 
   const setBookButtonState = () => {
@@ -122,7 +172,6 @@
     els.btnBook.disabled = !ok;
   };
 
-  // reset dropdown jam
   const clearSlots = (msg = 'Slot akan muncul setelah pilih paket & tanggal.') => {
     if (els.timeSel) {
       els.timeSel.innerHTML = `<option value="">${msg}</option>`;
@@ -130,20 +179,19 @@
       els.timeSel.value = '';
     }
     if (els.inputTime) els.inputTime.value = '';
-    if (els.sumTime) els.sumTime.textContent = '—';
     els.slotHint && (els.slotHint.textContent = msg);
     setBookButtonState();
   };
 
-  // ===== Slots Loader (with cancellation) =====
   const loadSlots = async () => {
     clearSlots('Memuat slot…');
 
     const date = els.dateEl?.value;
     const pkg  = els.inputPkg?.value;
-    if (!date || !pkg) { clearSlots(); return; }
+    const svc  = els.inputSvc?.value;
 
-    // cancel req sebelumnya
+    if (!date || !pkg || !svc) { clearSlots(); return; }
+
     if (slotsAbort) slotsAbort.abort();
     slotsAbort = new AbortController();
 
@@ -156,7 +204,7 @@
           'X-Requested-With': 'XMLHttpRequest',
           'X-CSRF-TOKEN': csrf(),
         },
-        body: JSON.stringify({ date, package: pkg }),
+        body: JSON.stringify({ date, service: els.inputSvc.value, package: pkg }),
         signal: slotsAbort.signal,
       });
 
@@ -165,7 +213,7 @@
         return;
       }
 
-      const slots = await res.json(); // [{start,end}, ...]
+      const slots = await res.json();
       if (!Array.isArray(slots) || !slots.length) {
         clearSlots('Tidak ada slot tersedia pada tanggal ini.');
         return;
@@ -183,65 +231,58 @@
       });
 
     } catch (err) {
-      if (err.name === 'AbortError') return; // di-cancel, no-op
+      if (err.name === 'AbortError') return;
       clearSlots('Gagal memuat slot.');
     }
   };
 
-  // ===== Package Select =====
   const selectPackage = (btn) => {
     if (!btn) return;
 
-    // visual
+    // visual active state
     els.pkgBtns.forEach(b => b.classList.remove('ring-2','ring-blue-600','bg-blue-50','border-blue-500'));
     btn.classList.add('ring-2','ring-blue-600','bg-blue-50','border-blue-500');
 
     // data
-    const id    = btn.dataset.id || btn.dataset.pkgId || '';
-    const name  = btn.dataset.name || '';
+    const id    = btn.dataset.id || '';
     const price = Number(btn.dataset.price || 0);
+    const desc  = btn.dataset.description || '';
 
     if (els.inputPkg)   els.inputPkg.value   = id;
     if (els.inputPrice) els.inputPrice.value = String(price);
 
-    els.info   && els.info.classList.remove('hidden');
-    els.nameEl && (els.nameEl.textContent  = name);
-    els.priceEl&& (els.priceEl.textContent = fmtRp(price));
+    // description box
+    if (els.pkgDesc) els.pkgDesc.textContent = desc || '—';
+    if (els.pkgDescWrap) els.pkgDescWrap.classList.toggle('hidden', !desc);
+    if (els.pkgDescHint) els.pkgDescHint.classList.toggle('hidden', !!desc);
 
-    els.sumName  && (els.sumName.textContent  = name);
-    els.sumPrice && (els.sumPrice.textContent = fmtRp(price));
-
-    // reset jam bila paket berubah
+    // reset slots when package changes
     clearSlots();
-
-    // reload slot jika tanggal sudah ada
     if (els.dateEl?.value) loadSlots();
     setBookButtonState();
   };
 
-  // ===== Events =====
+  // events
   els.pkgBtns.forEach(btn => btn.addEventListener('click', () => selectPackage(btn)));
 
   els.dateEl?.addEventListener('change', () => {
-    els.sumDate && (els.sumDate.textContent = fmtDate(els.dateEl.value));
     loadSlots();
-  });
-
-  // ketika user memilih jam di dropdown
-  els.timeSel?.addEventListener('change', () => {
-    const v = els.timeSel.value;
-    if (els.inputTime) els.inputTime.value = v || '';
-    if (els.sumTime) els.sumTime.textContent = v || '—';
     setBookButtonState();
   });
 
-  // preselect: paket termurah (aman kalau data-price ada)
+  els.timeSel?.addEventListener('change', () => {
+    const v = els.timeSel.value;
+    if (els.inputTime) els.inputTime.value = v || '';
+    setBookButtonState();
+  });
+
+  // auto select cheapest package
   if (els.pkgBtns.length) {
     const sorted = [...els.pkgBtns].sort((a,b) => Number(a.dataset.price||0) - Number(b.dataset.price||0));
     selectPackage(sorted[0]);
   }
 
-  // CTA → redirect ke halaman booking dengan query lengkap
+  // CTA redirect
   els.btnBook.addEventListener('click', () => {
     const svc  = els.inputSvc?.value;
     const pkg  = els.inputPkg?.value;
@@ -254,9 +295,9 @@
     const url = new URL("{{ route('booking.checkout') }}", window.location.origin);
     url.searchParams.set('service', svc);
     url.searchParams.set('package', pkg);
-    url.searchParams.set('date',    date);
-    url.searchParams.set('time',    time);
-    url.searchParams.set('price',   price);
+    url.searchParams.set('date', date);
+    url.searchParams.set('time', time);
+    url.searchParams.set('price', price);
 
     window.location.assign(url.toString());
   });
