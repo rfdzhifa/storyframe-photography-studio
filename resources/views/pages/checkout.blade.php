@@ -6,7 +6,7 @@
 
 @section('content')
 
-<form id="booking-form" data-url="{{ route('booking.store') }}" action="{{ route('booking.store') }}" method="POST"
+<form id="booking-form" data-url="{{ route('booking.checkout.store') }}"  action="{{ route('booking.checkout.store') }}"  method="POST"
   class="w-full min-h-screen pt-10 pb-16 bg-zinc-100 flex flex-col items-center px-4 md:px-10">
   @csrf
 

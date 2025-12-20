@@ -11,7 +11,7 @@
   <div class="w-full max-w-6xl mx-auto">
 
     <a href="{{ route('booking.catalog') }}"
-       class="text-sm px-4 py-2 rounded-full border border-gray-300 hover:bg-gray-100 inline-block mb-8">
+       class="text-sm px-4 py-2 rounded-full border border-gray-300 hover:bg-white hover:shadow-sm transition inline-flex items-center gap-2 mb-8">
       ← Kembali ke Catalog
     </a>
 
@@ -140,8 +140,7 @@
 @push('scripts')
 <script>
 (() => {
-  // ===== Utils =====
-  const $ = (sel, ctx = document) => ctx.querySelector(sel);
+  const $  = (sel, ctx = document) => ctx.querySelector(sel);
   const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
   const csrf = () => document.querySelector('meta[name="csrf-token"]')?.content || '';
 
@@ -156,7 +155,6 @@
     inputPkg:   $('#inputPackageId'),
     inputPrice: $('#inputPackagePrice'),
     inputTime:  $('#inputStartTime'),
-
     dateEl:  $('#bookingDate'),
     timeSel: $('#bookingTimeSelect'),
     slotHint: $('#slotHint'),
@@ -168,7 +166,7 @@
   let slotsAbort = null;
 
   const setBookButtonState = () => {
-    const ok = !!(els.inputPkg?.value && els.dateEl?.value && els.inputTime?.value);
+    const ok = !!(els.inputPkg.value && els.dateEl.value && els.inputTime.value);
     els.btnBook.disabled = !ok;
   };
 
@@ -196,7 +194,7 @@
     slotsAbort = new AbortController();
 
     try {
-      const res = await fetch("{{ route('booking.slots') }}", {
+      const res = await fetch(SLOTS_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -219,7 +217,7 @@
         return;
       }
 
-      els.slotHint && (els.slotHint.textContent = 'Pilih salah satu jam:');
+      els.slotHint.textContent = 'Pilih salah satu jam:';
       els.timeSel.disabled = false;
       els.timeSel.innerHTML = `<option value="">Pilih jam…</option>`;
 
@@ -284,12 +282,11 @@
 
   // CTA redirect
   els.btnBook.addEventListener('click', () => {
-    const svc  = els.inputSvc?.value;
-    const pkg  = els.inputPkg?.value;
-    const date = els.dateEl?.value;
-    const time = els.inputTime?.value;
-    const price= els.inputPrice?.value || '0';
-
+    const svc  = els.inputSvc.value;
+    const pkg  = els.inputPkg.value;
+    const date = els.dateEl.value;
+    const time = els.inputTime.value;
+    const price= els.inputPrice.value || '0';
     if (!svc || !pkg || !date || !time) return;
 
     const url = new URL("{{ route('booking.checkout') }}", window.location.origin);
@@ -301,6 +298,9 @@
 
     window.location.assign(url.toString());
   });
+
+  // preselect first
+  selectPackage(els.pkgBtns[0]);
 })();
 </script>
 @endpush

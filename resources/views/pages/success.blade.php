@@ -328,6 +328,11 @@
     </div>
 
     <script>
+        const bookingId = @json($booking->id);
+        const snapTokenUrl = @json(route('booking.snap-token', ['booking' => $booking->id]));
+        const initialSnapToken = @json($bookingData['snap_token'] ?? null);
+
+
         // Auto-update status every 10 seconds (jika status pending)
         let statusCheckInterval = null;
         let countdownInterval = null;
@@ -352,6 +357,11 @@
                     }
             }, 10000); // Poll setiap 10 detik
         }
+      } catch (e) {
+        console.error('Polling error:', e);
+      }
+    }, 10000);
+  }
 
         function startCountdownTimer() {
             const paymentState = '{{ $paymentState }}';
@@ -479,44 +489,43 @@
                 if (countdownInterval) clearInterval(countdownInterval);
             }
 
-        function continuePayment() {
-            const snapToken = '{{ $bookingData['snap_token'] ?? '' }}';
+  async function continuePayment() {
+    let snapToken = initialSnapToken;
 
-            if (!snapToken) {
-                alert('Token pembayaran tidak tersedia. Silakan refresh halaman.');
-                return;
-            }
-
-            if (typeof window.snap === 'undefined') {
-                alert('Midtrans Snap belum dimuat. Silakan refresh halaman dan coba lagi.');
-                return;
-            }
-
-            // Buka Midtrans Snap payment popup
-            window.snap.pay(snapToken, {
-                onSuccess: function (result) {
-                    console.log('Pembayaran berhasil:', result);
-                    // Tunggu beberapa detik untuk webhook memproses
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 2000);
-                },
-                onPending: function (result) {
-                    console.log('Pembayaran pending:', result);
-                    alert('Pembayaran sedang diproses. Silakan tunggu.');
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 2000);
-                },
-                onError: function (result) {
-                    console.error('Pembayaran gagal:', result);
-                    alert('Pembayaran gagal: ' + (result.status_message || 'Silakan coba lagi'));
-                },
-                onClose: function () {
-                    console.log('Pembayaran popup ditutup');
-                    alert('Anda menutup pembayaran. Klik tombol "Lanjutkan Pembayaran" untuk mencoba lagi.');
-                }
-            });
+    if (!snapToken) {
+      // token tidak ada → minta ke server
+      const res = await fetch(snapTokenUrl, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
         }
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success || !data.snap_token) {
+        alert(data.message || 'Token pembayaran tidak tersedia.');
+        return;
+      }
+
+      snapToken = data.snap_token;
+    }
+
+    if (typeof window.snap === 'undefined') {
+      alert('Midtrans Snap belum dimuat. Silakan refresh halaman dan coba lagi.');
+      return;
+    }
+
+    window.snap.pay(snapToken, {
+      onSuccess: () => setTimeout(() => window.location.reload(), 1500),
+      onPending: () => setTimeout(() => window.location.reload(), 1500),
+      onError: (r) => {
+        console.error(r);
+        alert('Pembayaran gagal. Silakan coba lagi.');
+      },
+      onClose: () => alert('Popup pembayaran ditutup. Klik "Lanjutkan Pembayaran" untuk coba lagi.')
+    });
+  }
     </script>
 @endsection
