@@ -2,57 +2,27 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
 class ServicePackage extends Pivot
 {
-    /**
-     * @var bool
-     */
-    public $incrementing = true;
-
-    /**
-     *
-     * @var string
-     */
     protected $table = 'service_packages';
 
-    /**
-     *
-     * @var array<int, string>
-     */
+    // karena tabel ini punya kolom id
+    public $incrementing = true;
+
     protected $fillable = [
         'service_id',
         'package_id',
         'price',
+        'description',
+        'duration_minutes',
         'is_active',
     ];
 
-    /**
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
         'price' => 'decimal:2',
+        'duration_minutes' => 'integer',
         'is_active' => 'boolean',
     ];
-
-    /**
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
-     */
-    public function service(): BelongsTo
-    {
-        return $this->belongsTo(Service::class);
-    }
-
-    /**
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
-     */
-    public function package(): BelongsTo
-    {
-        return $this->belongsTo(Package::class);
-    }
 }

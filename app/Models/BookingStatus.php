@@ -16,6 +16,14 @@ class BookingStatus extends Model
     protected $table = 'booking_status';
 
     /**
+     * @property int $id
+     * @property string $name
+     * @property string|null $color_indicator
+     * @property \Illuminate\Support\Carbon $created_at
+     * @property \Illuminate\Support\Carbon $updated_at
+     */
+
+    /**
      * @var array<int, string>
      */
     protected $fillable = [

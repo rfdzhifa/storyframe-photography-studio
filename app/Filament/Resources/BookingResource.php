@@ -236,4 +236,11 @@ class BookingResource extends Resource
     {
         return false;
     }
+
+public static function getEloquentQuery(): Builder
+{
+    return parent::getEloquentQuery()
+        ->notExpired();   // ← pakai scope dari model
+}
+
 }

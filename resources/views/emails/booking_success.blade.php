@@ -84,11 +84,11 @@
                         </p>
                         <p style="margin:0; font-size:14px; color:#111827;">
                             <strong>Service</strong><br>
-                            {{ $booking->service->name ?? '-' }}
+                            {{ optional($booking->service)->name ?? '-' }}
                         </p>
                         <p style="margin:6px 0 0 0; font-size:14px; color:#111827;">
                             <strong>Package</strong><br>
-                            {{ $booking->package->name ?? '-' }}
+                            {{ optional($booking->package)->name ?? '-' }}
                         </p>
                         <p style="margin:6px 0 0 0; font-size:14px; color:#111827;">
                             <strong>Date</strong><br>
@@ -133,8 +133,8 @@
                             </p>
                         @endif
 
-                        <p style="margin:10px 0 0 0; font-size:14px; color:#2563eb; font-weight:600;">
-                            Status: {{ $booking->bookingStatus->name }}
+                            <p style="margin:10px 0 0 0; font-size:14px; color:#2563eb; font-weight:600;">
+                            Status: {{ optional($booking->bookingStatus)->name ?? '-' }}
                         </p>
                     </td>
                 </tr>

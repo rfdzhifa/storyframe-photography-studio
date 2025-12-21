@@ -41,9 +41,7 @@
       <a href="{{ route('booking.detail', $svc->id) }}"
          class="group bg-white rounded-[20px] shadow-md hover:shadow-xl transition-all overflow-hidden flex flex-col">
         <div class="overflow-hidden">
-          <img src="{{ $svc->thumbnail ?? $fallback }}"
-               class="h-56 w-full object-cover transition-transform duration-500 group-hover:scale-105"
-               alt="{{ $svc->name }}" />
+          <img src="{{ route('booking.services.thumb', $svc->id) }}" class="h-56 w-full object-cover transition-transform duration-500 group-hover:scale-105"alt="{{ $svc->name }}" />
         </div>
         <div class="p-6 flex flex-col gap-3 flex-1">
           <h3 class="text-lg md:text-xl font-semibold text-gray-900">{{ $svc->name }}</h3>

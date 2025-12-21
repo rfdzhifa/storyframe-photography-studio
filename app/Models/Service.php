@@ -11,40 +11,37 @@ class Service extends Model
 {
     use HasFactory;
 
-    /**
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'name',
         'description',
         'is_active',
+        'thumb_mime',
+        'thumb_data',
     ];
 
-    /**
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
         'is_active' => 'boolean',
     ];
 
-    /**
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
-     */
     public function packages(): BelongsToMany
     {
-        return $this->belongsToMany(Package::class, 'service_packages')
-                    ->using(ServicePackage::class)
-                    ->withPivot('price', 'is_active')
-                    ->withTimestamps();
+        return $this->belongsToMany(
+                Package::class,
+                'service_packages',
+                'service_id',
+                'package_id'
+            )
+            ->using(ServicePackage::class)
+            ->withPivot([
+                'id',
+                'price',
+                'description',
+                'duration_minutes',
+                'is_active',
+            ])
+            ->withTimestamps();
     }
 
-    /**
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
-     */
     public function bookings(): HasMany
     {
         return $this->hasMany(Booking::class);

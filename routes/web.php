@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\BookingController; // Pastikan ini di-import
+use App\Http\Controllers\PaymentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -23,6 +24,9 @@ Route::prefix('booking')->name('booking.')->group(function () {
     // Main booking page
     Route::get('/', [BookingController::class, 'index'])->name('index');
 
+    // Thumbnail service (BLOB)
+    Route::get('/services/{service}/thumb', [BookingController::class, 'serviceThumb'])->name('services.thumb');
+
     // Pages: catalog & detail
     Route::get('/catalog', [BookingController::class, 'catalog'])->name('catalog');
     Route::get('/detail/{service}', [BookingController::class, 'detail'])->name('detail');
@@ -36,9 +40,18 @@ Route::prefix('booking')->name('booking.')->group(function () {
     // Get packages by service
     Route::post('/packages', [BookingController::class, 'getPackagesByService'])->name('packages');
 
-    Route::get('/checkout', [BookingController::class, 'checkout']) ->name('checkout');
-    Route::post('/checkout', [BookingController::class, 'store']) ->name('checkout.store');
+    Route::get('/checkout', [BookingController::class, 'checkout'])->name('checkout');
+    Route::post('/checkout', [BookingController::class, 'store'])->name('checkout.store');
 
     // Booking success page
     Route::get('/success/{booking}', [BookingController::class, 'success'])->name('success');
+
+    // API: Get booking status (for refresh)
+    Route::get('/{booking}/status', [BookingController::class, 'getBookingStatus'])->name('status');
+
+    Route::get('/{booking}/pay', [BookingController::class, 'pay'])->name('pay');
 });
+
+// Midtrans Notification Route (Exclude from CSRF in VerifyCsrfToken middleware if needed, or use API route)
+// For simplicity in this setup, we'll put it here but remember to exclude it from CSRF protection
+Route::post('/payment/notification', [PaymentController::class, 'notification'])->name('payment.notification');

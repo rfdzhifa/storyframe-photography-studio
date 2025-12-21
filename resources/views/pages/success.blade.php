@@ -2,7 +2,7 @@
 
 @extends('app')
 
-@section('title', 'Booking Berhasil')
+@section('title', 'Status Booking & Pembayaran')
 
 @push('styles')
     <style>
@@ -44,30 +44,93 @@
     </style>
 @endpush
 
+@push('scripts')
+    <script src="https://app.sandbox.midtrans.com/snap/snap.js"
+        data-client-key="{{ config('midtrans.client_key') }}"></script>
+@endpush
+
 @section('content')
     <div class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12 px-4">
         <div class="max-w-4xl mx-auto animate-fade-in-up">
-            <!-- Success Header -->
+
+            <!-- Header -->
             <div class="text-center mb-8">
-                <div
-                    class="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-4 animate-pulse-slow">
-                    <i class="fas fa-check text-3xl text-blue-500">🎉</i>
-                </div>
-                <h1 class="text-3xl font-bold text-gray-800 mb-2">Booking Berhasil!</h1>
-                <p class="text-gray-600">Terima kasih telah mempercayai layanan kami</p>
+            {{-- ICON STATUS --}}
+            <div
+                @if($paymentState === 'success')
+                    class="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4 animate-pulse-slow bg-green-100"
+                @elseif($paymentState === 'pending')
+                    class="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4 animate-pulse-slow bg-yellow-100"
+                @elseif($paymentState === 'failed')
+                    class="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4 animate-pulse-slow bg-red-100"
+                @else
+                    class="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4 animate-pulse-slow bg-blue-100"
+                @endif
+            >
+                <span class="text-3xl">
+                    @if($paymentState === 'success')
+                        🎉
+                    @elseif($paymentState === 'pending')
+                        ⏳
+                    @elseif($paymentState === 'failed')
+                        ❌
+                    @else
+                        📄
+                    @endif
+                </span>
             </div>
+
+            {{-- TITLE + TEXT --}}
+            @if($paymentState === 'success')
+                <h1 id="status-title" class="text-3xl font-bold text-gray-800 mb-2">Booking & Pembayaran Berhasil</h1>
+                <p id="status-subtext" class="text-gray-600">
+                    Pembayaran kamu sudah kami terima. Jadwal foto kamu sudah <span class="font-semibold">fix</span>.
+                </p>
+
+            @elseif($paymentState === 'pending')
+                <h1 id="status-title" class="text-3xl font-bold text-gray-800 mb-2">Booking Berhasil Dibuat</h1>
+                <p id="status-subtext" class="text-gray-600">
+                    Data booking sudah tersimpan. Selesaikan pembayaran dulu supaya slot kamu tidak dibatalkan.
+                </p>
+
+            @elseif($paymentState === 'failed')
+                <h1 id="status-title" class="text-3xl font-bold text-gray-800 mb-2">Booking Dibatalkan</h1>
+                <p id="status-subtext" class="text-gray-600">
+                    Pembayaran tidak berhasil atau sudah kedaluwarsa. Silakan buat booking baru jika masih ingin lanjut.
+                </p>
+
+            @else
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">Status Booking & Pembayaran</h1>
+                <p class="text-gray-600">Silakan cek detail booking di bawah ini.</p>
+            @endif
+        </div>
 
             <!-- Main Booking Card -->
             <div class="bg-white rounded-2xl card-shadow overflow-hidden mb-6">
                 <!-- Header -->
                 <div class="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
-                    <div class="flex items-center justify-between flex-wrap gap-2">
-                        <h2 class="text-xl font-bold text-white">Detail Booking</h2>
-                        <span class="bg-white/20 px-3 py-1 rounded-full text-sm text-white font-medium">
-                            {{ $bookingData['status'] }}
-                        </span>
-                    </div>
-                </div>
+    <div class="flex items-center justify-between flex-wrap gap-2">
+        <h2 class="text-xl font-bold text-white">Detail Booking</h2>
+        @if($bookingData['status'] === 'Pending Payment')
+            <span id="status-badge" class="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 border border-yellow-300">
+                {{ $bookingData['status'] }}
+            </span>
+        @elseif(in_array($bookingData['status'], ['Paid - DP', 'Paid - Full']))
+            <span id="status-badge" class="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-300">
+                {{ $bookingData['status'] }}
+            </span>
+        @elseif($bookingData['status'] === 'Cancelled')
+            <span id="status-badge" class="px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800 border border-red-300">
+                {{ $bookingData['status'] }}
+            </span>
+        @else
+            <span id="status-badge" class="px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 border border-gray-300">
+                {{ $bookingData['status'] }}
+            </span>
+        @endif
+    </div>
+</div>
+
 
                 <!-- Booking Code Highlight -->
                 <div class="bg-gray-50 px-6 py-4 border-b">
@@ -208,8 +271,7 @@
                         </div>
                     @endif
 
-                    <!-- Timestamp -->
-                    <div class="mt-6 text-center">
+                    <div class="mt-6 text-center space-y-3">
                         <div
                             class="inline-flex items-center space-x-2 text-sm text-gray-500 bg-gray-100 rounded-full px-4 py-2">
                             <i class="fas fa-clock"></i>
@@ -220,9 +282,16 @@
             </div>
 
             <!-- Action Buttons -->
-            <div class="grid grid-cols-1 sm:grid-cols-1 gap-4">
+            <div class="flex flex-col sm:flex-row justify-center gap-4">
+                @if($paymentState === 'pending')
+                    <a href="{{ route('booking.pay', $booking) }}"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-8 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center">
+                        <i class="fas fa-credit-card mr-2"></i>
+                        Lanjutkan Pembayaran
+                    </a>
+                @endif
                 <a href="{{ url('/') }}"
-                    class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 px-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center">
+                    class="bg-gray-500 hover:bg-gray-600 text-white font-medium py-3 px-8 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center">
                     <i class="fas fa-home mr-2"></i>
                     Kembali ke Home
                 </a>
@@ -248,9 +317,206 @@
                             <i class="fas fa-envelope mr-1"></i>
                             info@studio.com
                         </a>
+                        <button onclick="refreshBookingStatus()" class="flex items-center text-green-600 hover:text-green-800 ml-4">
+                            <i class="fas fa-sync-alt mr-1"></i>
+                            Refresh Status
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <script>
+        // Auto-update status every 10 seconds (jika status pending)
+        let statusCheckInterval = null;
+        let countdownInterval = null;
+
+        function startStatusPolling() {
+            const paymentState = '{{ $paymentState }}';
+            if (paymentState !== 'pending') return; // Hanya polling jika pending
+
+            // Cek status setiap 10 detik
+            statusCheckInterval = setInterval(async function() {
+                const response = await fetch(`/booking/${bookingId}/status`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.success) {
+                            // Jika status berubah dari pending menjadi cancelled/success, reload
+                            if (data.payment_state !== 'pending') {
+                                clearInterval(statusCheckInterval);
+                                clearInterval(countdownInterval);
+                                window.location.reload();
+                            }
+                        }
+                    }
+            }, 10000); // Poll setiap 10 detik
+        }
+
+        function startCountdownTimer() {
+            const paymentState = '{{ $paymentState }}';
+            if (paymentState !== 'pending') return;
+
+            const expiresAtStr = '{{ $booking->expires_at }}';
+            if (!expiresAtStr) return;
+
+            const expiresAt = new Date(expiresAtStr);
+            const timerElement = document.getElementById('expiry-timer');
+            if (!timerElement) return;
+
+            countdownInterval = setInterval(function() {
+                const now = new Date();
+                const diff = expiresAt - now;
+
+                if (diff <= 0) {
+                    clearInterval(countdownInterval);
+                    timerElement.textContent = 'Sudah expired';
+                    timerElement.classList.add('text-red-600', 'font-bold');
+                    // Trigger a status refresh so server can mark booking as cancelled and UI updates
+                    try {
+                        // call refresh which will fetch status and reload the page
+                        refreshBookingStatus();
+                    } catch (e) {
+                        console.error('Failed to refresh booking status after expiry', e);
+                    }
+                    return;
+                }
+
+                const minutes = Math.floor(diff / 60000);
+                const seconds = Math.floor((diff % 60000) / 1000);
+                timerElement.textContent = `${minutes}m ${seconds}s`;
+
+                // Ubah warna jika tinggal 5 menit
+                if (diff < 300000) {
+                    timerElement.classList.add('text-red-600', 'font-bold');
+                }
+            }, 1000); // Update setiap 1 detik
+        }
+
+        // Jalankan polling dan timer saat halaman load
+        document.addEventListener('DOMContentLoaded', function() {
+            startStatusPolling();
+            startCountdownTimer();
+        });
+
+        // Cleanup saat halaman ditinggalkan
+        window.addEventListener('beforeunload', function() {
+            if (statusCheckInterval) clearInterval(statusCheckInterval);
+            if (countdownInterval) clearInterval(countdownInterval);
+        });
+
+        async function refreshBookingStatus() {
+            try {
+                const bookingId = '{{ $booking->id }}';
+                const response = await fetch(`/booking/${bookingId}/status`), {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Gagal memperbarui status');
+                }
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // If the booking is still pending, let polling handle reloads.
+                    // If it's non-pending (failed/success), update UI immediately.
+                    if (data.payment_state === 'pending') {
+                        return;
+                    }
+
+                    applyStatusUpdateFromApi(data);
+                } else {
+                    alert('Status tidak berubah. Silakan coba lagi nanti.');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Terjadi error saat memperbarui status: ' + error.message);
+            }
+        }
+
+            // If the booking is expired and server reports non-pending state, update UI without full reload
+            function applyStatusUpdateFromApi(data) {
+                if (!data || !data.success) return;
+
+                const state = data.payment_state || '';
+
+                if (state === 'pending') return;
+
+                // Update title and subtext
+                const titleEl = document.getElementById('status-title');
+                const subtextEl = document.getElementById('status-subtext');
+                const badgeEl = document.getElementById('status-badge');
+                const expiryEl = document.getElementById('expiry-container');
+                const continueBtn = document.getElementById('continue-payment-btn');
+
+                if (state === 'failed') {
+                    if (titleEl) titleEl.textContent = 'Booking Dibatalkan';
+                    if (subtextEl) subtextEl.textContent = 'Pembayaran tidak berhasil atau sudah kedaluwarsa. Silakan buat booking baru jika masih ingin lanjut.';
+                    if (badgeEl) {
+                        badgeEl.textContent = 'Cancelled';
+                        badgeEl.className = 'px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800 border border-red-300';
+                    }
+                } else if (state === 'success') {
+                    if (titleEl) titleEl.textContent = 'Booking & Pembayaran Berhasil';
+                    if (subtextEl) subtextEl.innerHTML = 'Pembayaran kamu sudah kami terima. Jadwal foto kamu sudah <span class="font-semibold">fix</span>.';
+                    if (badgeEl) {
+                        badgeEl.textContent = data.status || 'Paid';
+                        badgeEl.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-300';
+                    }
+                }
+
+                // Hide expiry and continue button
+                if (expiryEl) expiryEl.style.display = 'none';
+                if (continueBtn) continueBtn.style.display = 'none';
+
+                // stop intervals
+                if (statusCheckInterval) clearInterval(statusCheckInterval);
+                if (countdownInterval) clearInterval(countdownInterval);
+            }
+
+        function continuePayment() {
+            const snapToken = '{{ $bookingData['snap_token'] ?? '' }}';
+
+            if (!snapToken) {
+                alert('Token pembayaran tidak tersedia. Silakan refresh halaman.');
+                return;
+            }
+
+            if (typeof window.snap === 'undefined') {
+                alert('Midtrans Snap belum dimuat. Silakan refresh halaman dan coba lagi.');
+                return;
+            }
+
+            // Buka Midtrans Snap payment popup
+            window.snap.pay(snapToken, {
+                onSuccess: function (result) {
+                    console.log('Pembayaran berhasil:', result);
+                    // Tunggu beberapa detik untuk webhook memproses
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                },
+                onPending: function (result) {
+                    console.log('Pembayaran pending:', result);
+                    alert('Pembayaran sedang diproses. Silakan tunggu.');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                },
+                onError: function (result) {
+                    console.error('Pembayaran gagal:', result);
+                    alert('Pembayaran gagal: ' + (result.status_message || 'Silakan coba lagi'));
+                },
+                onClose: function () {
+                    console.log('Pembayaran popup ditutup');
+                    alert('Anda menutup pembayaran. Klik tombol "Lanjutkan Pembayaran" untuk mencoba lagi.');
+                }
+            });
+        }
+    </script>
 @endsection
