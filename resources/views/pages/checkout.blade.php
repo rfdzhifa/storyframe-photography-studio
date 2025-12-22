@@ -6,7 +6,7 @@
 
 @section('content')
 
-<form id="booking-form" data-url="{{ route('booking.store') }}" action="{{ route('booking.store') }}" method="POST"
+<form id="booking-form" novalidate data-url="{{ route('booking.store') }}" action="{{ route('booking.store') }}" method="POST"
   class="w-full min-h-screen pt-10 pb-16 bg-zinc-100 flex flex-col items-center px-4 md:px-10">
   @csrf
 
@@ -302,8 +302,10 @@
   </div>
 </div>
 
+@push('scripts')
 <script>
   document.addEventListener('DOMContentLoaded', function () {
+    console.log('validation script running');
     // helper
     function setText(id, value, fallback = '-') {
       const el = document.getElementById(id);
@@ -405,14 +407,13 @@
     // Tampilkan error di bawah input text
     function showFieldError(inputEl, message) {
       if (!inputEl) return;
-      const wrapper = inputEl.closest('.w-full') || inputEl.parentElement;
-      if (!wrapper) return;
 
-      let errorEl = wrapper.querySelector('.client-error');
-      if (!errorEl) {
+      let errorEl = inputEl.nextElementSibling;
+
+      if (!errorEl || !errorEl.classList.contains('client-error')) {
         errorEl = document.createElement('p');
         errorEl.className = 'client-error text-sm text-red-500 mt-1';
-        wrapper.appendChild(errorEl);
+        inputEl.insertAdjacentElement('afterend', errorEl);
       }
       errorEl.textContent = message;
     }
@@ -429,6 +430,33 @@
         paymentWrapper.appendChild(errorEl);
       }
       errorEl.textContent = message;
+    }
+
+    function isValidEmail(email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return emailRegex.test(email);
+    }
+
+    function normalizePhoneNumber(phone) {
+      let p = (phone || '').trim().replace(/[\s\-\.\(\)]/g,'');
+
+      if (p.startsWith('+62')) {
+        p = '0' + p.slice(3);
+      } else if (p.startsWith('62')) {
+        p = '0' + p.slice(2);
+      }
+
+      return p;
+    }
+
+    function isValidPhoneId(phone) {
+        const p = normalizePhoneNumber(phone);
+
+        if(!/^0\d+$/.test(p)) return false;
+        if(p.length<9 ||p.length>13) return false;
+        if(!p.startsWith('08')) return false;
+
+        return true;
     }
 
     // Validasi front-end
@@ -450,10 +478,16 @@
       if (!email.value.trim()) {
         showFieldError(email, 'Email wajib diisi.');
         valid = false;
+      } else if (!isValidEmail(email.value.trim())) {
+        showFieldError(email, 'Format email tidak valid. Contoh: nama@gmail.com');
+        valid = false;
       }
 
       if (!phone.value.trim()) {
         showFieldError(phone, 'Phone Number wajib diisi.');
+        valid = false;
+      } else if (!isValidPhoneId(phone.value)){
+        showFieldError(phone, 'Nomor HP tidak valid. Contoh: 081234567890 atau +6281234567890')
         valid = false;
       }
 
@@ -472,15 +506,20 @@
     // Intercept submit form → validasi → kalau lolos, baru buka modal
     if (form) {
       form.addEventListener('submit', function (e) {
+        console.log('submit fired')
         e.preventDefault();
 
-        if (!validateForm()) {
-          const firstError = document.querySelector('.client-error');
-          if (firstError) {
-            firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-          return;
-        }
+        // if (!validateForm()) {
+        //   const firstError = document.querySelector('.client-error');
+        //   if (firstError) {
+        //     firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        //   }
+        //   return;
+        // }
+        const ok = validateForm();
+        console.log('valid', ok)
+
+        if(!ok) return;
 
         openModal();
       });
@@ -543,5 +582,7 @@
     }
   });
 </script>
+
+@endpush
 
 @endsection
