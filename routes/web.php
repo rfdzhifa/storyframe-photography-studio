@@ -50,6 +50,8 @@ Route::prefix('booking')->name('booking.')->group(function () {
     Route::get('/{booking}/status', [BookingController::class, 'getBookingStatus'])->name('status');
 
     Route::get('/{booking}/pay', [BookingController::class, 'pay'])->name('pay');
+
+    Route::get('/{booking}/sync-payment', [BookingController::class, 'syncPaymentStatus']) ->name('syncPayment');
 });
 
 // Midtrans Notification Route (Exclude from CSRF in VerifyCsrfToken middleware if needed, or use API route)

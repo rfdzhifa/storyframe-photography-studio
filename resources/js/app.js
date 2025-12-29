@@ -7,6 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initNavbarScroll();
     initFullPageScroll();
     initServiceGallery();
-    initBookingSlide();
+    if (typeof initBookingSlide === 'function') {
+        initBookingSlide();
+    }
     initSuccses();
 });

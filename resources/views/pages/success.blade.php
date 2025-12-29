@@ -330,154 +330,81 @@
     <script>
         // Auto-update status every 10 seconds (jika status pending)
         let statusCheckInterval = null;
-        let countdownInterval = null;
+
+        const bookingKey = @json($booking->getRouteKey());
+        const paymentStateFromServer = @json($paymentState);
+        const syncUrl = @json(url("/booking")) + `/${bookingKey}/sync-payment`;
+        const statusUrl = @json(url("/booking")) + `/${bookingKey}/status`;
 
         function startStatusPolling() {
-            const paymentState = '{{ $paymentState }}';
-            if (paymentState !== 'pending') return; // Hanya polling jika pending
+        if (paymentStateFromServer !== 'pending') return;
 
-            // Cek status setiap 10 detik
-            statusCheckInterval = setInterval(async function() {
-                const response = await fetch(`/booking/${bookingId}/status`);
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.success) {
-                            // Jika status berubah dari pending menjadi cancelled/success, reload
-                            if (data.payment_state !== 'pending') {
-                                clearInterval(statusCheckInterval);
-                                clearInterval(countdownInterval);
-                                window.location.reload();
-                            }
-                        }
-                    }
-            }, 10000); // Poll setiap 10 detik
-        }
-
-        function startCountdownTimer() {
-            const paymentState = '{{ $paymentState }}';
-            if (paymentState !== 'pending') return;
-
-            const expiresAtStr = '{{ $booking->expires_at }}';
-            if (!expiresAtStr) return;
-
-            const expiresAt = new Date(expiresAtStr);
-            const timerElement = document.getElementById('expiry-timer');
-            if (!timerElement) return;
-
-            countdownInterval = setInterval(function() {
-                const now = new Date();
-                const diff = expiresAt - now;
-
-                if (diff <= 0) {
-                    clearInterval(countdownInterval);
-                    timerElement.textContent = 'Sudah expired';
-                    timerElement.classList.add('text-red-600', 'font-bold');
-                    // Trigger a status refresh so server can mark booking as cancelled and UI updates
-                    try {
-                        // call refresh which will fetch status and reload the page
-                        refreshBookingStatus();
-                    } catch (e) {
-                        console.error('Failed to refresh booking status after expiry', e);
-                    }
-                    return;
-                }
-
-                const minutes = Math.floor(diff / 60000);
-                const seconds = Math.floor((diff % 60000) / 1000);
-                timerElement.textContent = `${minutes}m ${seconds}s`;
-
-                // Ubah warna jika tinggal 5 menit
-                if (diff < 300000) {
-                    timerElement.classList.add('text-red-600', 'font-bold');
-                }
-            }, 1000); // Update setiap 1 detik
-        }
-
-        // Jalankan polling dan timer saat halaman load
-        document.addEventListener('DOMContentLoaded', function() {
-            startStatusPolling();
-            startCountdownTimer();
-        });
-
-        // Cleanup saat halaman ditinggalkan
-        window.addEventListener('beforeunload', function() {
-            if (statusCheckInterval) clearInterval(statusCheckInterval);
-            if (countdownInterval) clearInterval(countdownInterval);
-        });
-
-        async function refreshBookingStatus() {
+        statusCheckInterval = setInterval(async () => {
             try {
-                const bookingId = '{{ $booking->id }}';
-                const response = await fetch(`/booking/${bookingId}/status`), {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
-                    }
-                });
+                // OPTIONAL: sync dulu kalau kamu bikin endpoint sync-payment
+                // (kalau belum ada, comment aja 2 baris ini)
+                await fetch(syncUrl, { method: 'GET' });
 
-                if (!response.ok) {
-                    throw new Error('Gagal memperbarui status');
-                }
+                const response = await fetch(statusUrl, { method: 'GET' });
+                if (!response.ok) return;
 
                 const data = await response.json();
 
-                if (data.success) {
-                    // If the booking is still pending, let polling handle reloads.
-                    // If it's non-pending (failed/success), update UI immediately.
-                    if (data.payment_state === 'pending') {
-                        return;
+                if (data && data.success) {
+                    // kalau status sudah bukan pending -> reload biar blade render ulang
+                    if (data.payment_state && data.payment_state !== 'pending') {
+                        clearInterval(statusCheckInterval);
+                        if (countdownInterval) clearInterval(countdownInterval);
+                        window.location.reload();
                     }
-
-                    applyStatusUpdateFromApi(data);
-                } else {
-                    alert('Status tidak berubah. Silakan coba lagi nanti.');
                 }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Terjadi error saat memperbarui status: ' + error.message);
+            } catch (e) {
+                console.error('Polling error:', e);
             }
+        }, 3000); // 3 detik biar responsif
+    }
+
+    async function refreshBookingStatus() {
+        try {
+            // OPTIONAL: sync dulu kalau endpoint ada
+            await fetch(syncUrl, { method: 'GET' });
+
+            const response = await fetch(statusUrl, { method: 'GET' });
+            if (!response.ok) throw new Error('Gagal memperbarui status');
+
+            const data = await response.json();
+
+            if (!data || !data.success) {
+                alert('Status tidak berubah. Silakan coba lagi nanti.');
+                return;
+            }
+
+            // kalau masih pending, biarin polling jalan
+            if (data.payment_state === 'pending') return;
+
+            // kalau kamu mau update UI tanpa reload:
+            if (typeof applyStatusUpdateFromApi === 'function') {
+                applyStatusUpdateFromApi(data);
+            } else {
+                // fallback: reload
+                window.location.reload();
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Terjadi error saat memperbarui status: ' + error.message);
         }
+    }
 
-            // If the booking is expired and server reports non-pending state, update UI without full reload
-            function applyStatusUpdateFromApi(data) {
-                if (!data || !data.success) return;
+    // ====== INIT ======
+    document.addEventListener('DOMContentLoaded', () => {
+        startStatusPolling();
+        startCountdownTimer();
+    });
 
-                const state = data.payment_state || '';
-
-                if (state === 'pending') return;
-
-                // Update title and subtext
-                const titleEl = document.getElementById('status-title');
-                const subtextEl = document.getElementById('status-subtext');
-                const badgeEl = document.getElementById('status-badge');
-                const expiryEl = document.getElementById('expiry-container');
-                const continueBtn = document.getElementById('continue-payment-btn');
-
-                if (state === 'failed') {
-                    if (titleEl) titleEl.textContent = 'Booking Dibatalkan';
-                    if (subtextEl) subtextEl.textContent = 'Pembayaran tidak berhasil atau sudah kedaluwarsa. Silakan buat booking baru jika masih ingin lanjut.';
-                    if (badgeEl) {
-                        badgeEl.textContent = 'Cancelled';
-                        badgeEl.className = 'px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800 border border-red-300';
-                    }
-                } else if (state === 'success') {
-                    if (titleEl) titleEl.textContent = 'Booking & Pembayaran Berhasil';
-                    if (subtextEl) subtextEl.innerHTML = 'Pembayaran kamu sudah kami terima. Jadwal foto kamu sudah <span class="font-semibold">fix</span>.';
-                    if (badgeEl) {
-                        badgeEl.textContent = data.status || 'Paid';
-                        badgeEl.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-300';
-                    }
-                }
-
-                // Hide expiry and continue button
-                if (expiryEl) expiryEl.style.display = 'none';
-                if (continueBtn) continueBtn.style.display = 'none';
-
-                // stop intervals
-                if (statusCheckInterval) clearInterval(statusCheckInterval);
-                if (countdownInterval) clearInterval(countdownInterval);
-            }
+    window.addEventListener('beforeunload', () => {
+        if (statusCheckInterval) clearInterval(statusCheckInterval);
+        if (countdownInterval) clearInterval(countdownInterval);
+    });
 
         function continuePayment() {
             const snapToken = '{{ $bookingData['snap_token'] ?? '' }}';

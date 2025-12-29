@@ -11,6 +11,7 @@ use App\Models\ServicePackage;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Mail;
@@ -299,7 +300,7 @@ public function store(Request $request)
         $params = [
             'transaction_details' => [
                 'order_id'      => $booking->booking_code,
-                'gross_amount'  => (int) $booking->total_price,
+                'gross_amount'  => $chargeAmount,
             ],
             'customer_details' => [
                 'first_name' => $booking->customer_name,
@@ -408,7 +409,7 @@ public function store(Request $request)
                 $params = [
                     'transaction_details' => [
                         'order_id' => $booking->booking_code,
-                        'gross_amount' => (int) $booking->total_price,
+                        'gross_amount' => $chargeAmount,
                     ],
                     'customer_details' => [
                         'first_name' => $booking->customer_name,
@@ -418,7 +419,7 @@ public function store(Request $request)
                     'item_details' => [
                         [
                             'id' => 'booking-' . $booking->id,
-                            'price' => (int) $booking->total_price,
+                            'price' => $chargeAmount,
                             'quantity' => 1,
                             'name' => $booking->service->name . ' - ' . $booking->package->name
                         ]
@@ -458,7 +459,7 @@ public function store(Request $request)
             'total_price' => number_format($booking->total_price, 0, ',', '.'),
             'payment_option' => $booking->payment_option === 'dp' ? 'Down Payment (50%)' : 'Full Payment',
             'down_payment_amount' => $booking->down_payment_amount ? number_format($booking->down_payment_amount, 0, ',', '.') : null,
-                'status' => $booking->bookingStatus?->name ?? 'Unknown',
+            'status' => $booking->bookingStatus?->name ?? 'Unknown',
             'notes' => $booking->notes,
             'created_at' => $booking->created_at->format('d F Y, H:i'),
             'snap_token' => $snapToken,
@@ -647,6 +648,75 @@ public function store(Request $request)
         'booking'   => $booking,
         'snapToken' => $snapToken,
     ]);
+}
+
+public function syncPaymentStatus(Booking $booking)
+{
+    $serverKey = config('midtrans.server_key');
+
+    $resp = Http::withBasicAuth($serverKey, '')
+        ->get("https://api.sandbox.midtrans.com/v2/{$booking->booking_code}/status");
+
+    if (!$resp->ok()) {
+        return response()->json(['success' => false, 'midtrans' => $resp->json()], 500);
+    }
+
+    $data = $resp->json();
+    $transaction = $data['transaction_status'] ?? null;
+    $fraud = $data['fraud_status'] ?? null;
+
+    // mapping
+    if ($transaction === 'settlement' || $transaction === 'capture') {
+        if ($transaction === 'capture' && $fraud === 'challenge') {
+            $statusName = 'Pending Payment';
+        } else {
+            $statusName = $booking->payment_option === 'dp' ? 'Paid - DP' : 'Paid - Full';
+        }
+    } elseif ($transaction === 'pending') {
+        $statusName = 'Pending Payment';
+    } elseif (in_array($transaction, ['deny','expire','cancel'], true)) {
+        $statusName = 'Cancelled';
+    } else {
+        $statusName = null;
+    }
+
+    if ($statusName) {
+        $status = BookingStatus::where('name', $statusName)->first();
+        if ($status) {
+            $booking->booking_status_id = $status->id;
+
+            if ($statusName === 'Pending Payment') $booking->payment_status = 'pending';
+            elseif (str_contains($statusName, 'Paid')) $booking->payment_status = 'success';
+            else $booking->payment_status = 'failed';
+
+            $booking->save();
+        }
+    }
+
+    $booking->load('bookingStatus');
+
+    return response()->json([
+        'success' => true,
+        'transaction_status' => $transaction,
+        'status' => $booking->bookingStatus?->name,
+        'payment_status' => $booking->payment_status,
+    ]);
+}
+
+
+private function setBookingStatus(Booking $booking, string $statusName)
+{
+    $status = BookingStatus::where('name', $statusName)->first();
+    if (!$status) return;
+
+    $booking->booking_status_id = $status->id;
+
+    if ($statusName === 'Pending Payment') $booking->payment_status = 'pending';
+    elseif (str_contains($statusName, 'Paid')) $booking->payment_status = 'success';
+    elseif (in_array($statusName, ['Cancelled','Rejected'], true)) $booking->payment_status = 'failed';
+
+    $booking->save();
+    $booking->load('bookingStatus');
 }
 
 }
