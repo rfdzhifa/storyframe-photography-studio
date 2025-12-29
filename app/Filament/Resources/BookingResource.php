@@ -34,65 +34,86 @@ class BookingResource extends Resource
             Forms\Components\TextInput::make('customer_name')->required(),
             Forms\Components\TextInput::make('customer_email')->email()->required(),
             Forms\Components\TextInput::make('customer_phone')->required(),
-            Forms\Components\Select::make('service_id')
-            ->label('Service')
-            ->relationship('service', 'name')
-            ->required()
-            ->reactive(),
-            Forms\Components\Select::make('package_id')
-            ->label('Package')
-            ->options(function (callable $get) {
-                $serviceId = $get('service_id');
-                if (!$serviceId) return [];
+            Forms\Components\Hidden::make('id'),
 
-                // Ambil package dari pivot table
-                return \DB::table('service_packages')
-                    ->join('packages', 'packages.id', '=', 'service_packages.package_id')
-                    ->where('service_packages.service_id', $serviceId)
-                    ->where('service_packages.is_active', true)
-                    ->pluck('packages.name', 'packages.id');
-            })
-            ->required()
-            ->reactive()
-            ->afterStateUpdated(fn (callable $get, callable $set) => $set('total_price', self::getPrice($get('service_id'), $get('package_id')))),
-            Forms\Components\DatePicker::make('booking_date')
-            ->label('Tanggal Booking')
-            ->required()
-            ->reactive()
-            ->minDate(now()->startOfDay())
-            ->maxDate(now()->addDays(30)) // max 30 hari ke depan
-            ->native(false),
-            Forms\Components\Select::make('time_slot')
-            ->label('Jam Booking')
-            ->options(function (callable $get) {
-                $serviceId = $get('service_id');
-                $packageId = $get('package_id');
-                $date = $get('booking_date');
+Forms\Components\Select::make('service_id')
+    ->label('Service')
+    ->relationship('service', 'name')
+    ->required()
+    ->reactive()
+    ->afterStateUpdated(function (callable $set) {
+        $set('package_id', null);
+        $set('time_slot', null);
+    }),
 
-        if (!$serviceId || !$packageId || !$date) {
-            return [];
+Forms\Components\Select::make('package_id')
+    ->label('Package')
+    ->options(function (callable $get) {
+        $serviceId = $get('service_id');
+        if (!$serviceId) return [];
+
+        return DB::table('service_packages')
+            ->join('packages', 'packages.id', '=', 'service_packages.package_id')
+            ->where('service_packages.service_id', $serviceId)
+            ->where('service_packages.is_active', true)
+            ->pluck('packages.name', 'packages.id');
+    })
+    ->required()
+    ->reactive()
+    ->afterStateUpdated(function (callable $get, callable $set) {
+        $set('total_price', self::getPrice($get('service_id'), $get('package_id')));
+        $set('time_slot', null);
+    }),
+
+Forms\Components\DatePicker::make('booking_date')
+    ->label('Tanggal Booking')
+    ->required()
+    ->reactive()
+    ->minDate(now()->startOfDay())
+    ->maxDate(now()->addDays(30))
+    ->native(false)
+    ->afterStateUpdated(fn (callable $set) => $set('time_slot', null)),
+
+Forms\Components\Select::make('time_slot')
+    ->label('Jam Booking')
+    ->reactive()
+    ->afterStateHydrated(function (callable $set, $record) {
+        if ($record?->start_time) {
+            $set('time_slot', Carbon::parse($record->start_time)->format('H:i:s'));
         }
+    })
+    ->options(function (callable $get) {
+        $serviceId = $get('service_id');
+        $packageId = $get('package_id');
+        $date      = $get('booking_date');
 
-        $dateOnly = Carbon::parse($date)->format('Y-m-d'); // 💉 fix
+        if (!$serviceId || !$packageId || !$date) return [];
 
-        $package = \App\Models\Package::find($packageId);
-        $duration = $package?->duration ?? 30;
-
+        $dateOnly  = Carbon::parse($date)->format('Y-m-d');
+        $duration  = self::getDurationMinutes($serviceId, $packageId);
         $dayOfWeek = Carbon::parse($date)->dayOfWeek;
 
         $schedule = \App\Models\WeeklySchedule::where('day_of_week', $dayOfWeek)->first();
         if (!$schedule) return [];
 
         $start = Carbon::parse("$dateOnly {$schedule->start_time}");
-        $end = Carbon::parse("$dateOnly {$schedule->end_time}");
+        $end   = Carbon::parse("$dateOnly {$schedule->end_time}");
+
+        $editingId = $get('id');
 
         $existingBookings = Booking::where('booking_date', $dateOnly)
             ->where('service_id', $serviceId)
+            ->whereHas('bookingStatus', function ( $q) {
+                $q->whereIn('name', ['Pending', 'Paid - DP', 'Paid - Full']);
+            })
+            ->when($editingId, fn ($q) => $q->where('id', '!=', $editingId))
             ->get();
 
         $slots = [];
+
         while ($start->lt($end)) {
             $slotEnd = (clone $start)->addMinutes($duration);
+            if ($slotEnd->gt($end)) break;
 
             $isBooked = $existingBookings->first(function ($b) use ($start, $slotEnd) {
                 return Carbon::parse($b->start_time)->lt($slotEnd)
@@ -100,8 +121,7 @@ class BookingResource extends Resource
             });
 
             if (!$isBooked) {
-                $label = $start->format('H:i') . ' - ' . $slotEnd->format('H:i');
-                $slots[$start->format('H:i:s')] = $label;
+                $slots[$start->format('H:i:s')] = $start->format('H:i') . ' - ' . $slotEnd->format('H:i');
             }
 
             $start->addMinutes($duration);
@@ -110,7 +130,6 @@ class BookingResource extends Resource
         return $slots;
     })
     ->required()
-    ->dehydrated(fn () => true)
     ->disabled(fn (callable $get) => !$get('service_id') || !$get('package_id') || !$get('booking_date'))
     ->hint('Slot otomatis tergenerate dari jadwal dan booking yang ada')
     ->hidden(fn (callable $get) => !$get('booking_date')),
@@ -204,6 +223,16 @@ class BookingResource extends Resource
         return $price ?? null;
     }
 
+    protected static function getDurationMinutes($serviceId, $packageId): int
+{
+    if (!$serviceId || !$packageId) return 30;
+
+    return (int) (DB::table('service_packages')
+        ->where('service_id', $serviceId)
+        ->where('package_id', $packageId)
+        ->value('duration_minutes') ?? 30);
+}
+
     public static function mutateFormDataBeforeCreate(array $data): array
     {
 
@@ -213,7 +242,8 @@ class BookingResource extends Resource
 
             $start = Carbon::parse($bookingDateOnly . ' ' . $data['time_slot']);
 
-            $duration = \App\Models\Package::find($data['package_id'])?->duration ?? 30;
+            // $duration = \App\Models\Package::find($data['package_id'])?->duration ?? 30;
+            $duration = self::getDurationMinutes($data['service_id'], $data['package_id']);
             $end = (clone $start)->addMinutes($duration);
 
             $data['start_time'] = $start->format('H:i:s');
